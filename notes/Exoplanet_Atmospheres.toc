@@ -1,0 +1,18 @@
+\contentsline {section}{\numberline {1}Elliptical Orbits}{2}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Kepler's Laws}{2}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Lagrange Points}{2}{subsection.1.2}%
+\contentsline {section}{\numberline {2}Keywords \& Definitions}{3}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Hot Jupiters}{3}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Super-Earths/Small Neptunes}{3}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Radial Velocity Semi-Amplitude}{3}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Emission Spectroscopy}{3}{subsection.2.4}%
+\contentsline {subsection}{\numberline {2.5}Transmission Spectroscopy}{3}{subsection.2.5}%
+\contentsline {subsection}{\numberline {2.6}High vs Low Resolution Spectroscopy}{4}{subsection.2.6}%
+\contentsline {section}{\numberline {3}Code and Computer Modelling}{5}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Cross Correlation Functions}{5}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Kernel}{5}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Retrievals}{5}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}petitRADTRANS Python Package}{5}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}Beer's Law}{6}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Beer's Law Applied to Planetary Transits}{6}{subsection.3.6}%
+\contentsline {section}{References}{7}{section*.11}%
