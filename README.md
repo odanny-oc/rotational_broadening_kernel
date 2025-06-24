@@ -1,2 +1,3 @@
 # exoplanet_atmospheres
-- Generic kernel shape ~ veqsqrt(1-x^2)
+- Generic kernel shape ~ sqrt(1-(x/veq)^2)
+
