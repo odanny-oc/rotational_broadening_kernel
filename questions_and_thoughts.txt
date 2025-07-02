@@ -1,21 +1,26 @@
 impact parameter (b)
 add blue shifted to red shifted spectrum?
-limb darkening models
 dark side models
 
 
 wasp 121b
 exoplanets.org
+
+Papers:
 2020 Gibson high res
 2019 Retrivals
+swaetha paper
 
 to do:
-Kp - vsys plots
-forward model PRT wasp 121b (2-5 microns)
+WASP121-b thermal inversions
 model for day and night side (h2o and co)
 Kp difference plot?
 
+planet star : 2 pi Rpl^2 flux/(2 pi Rst^2 pi bb)
 
+sysrem uniform noise
+
+orders
 
 
 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
