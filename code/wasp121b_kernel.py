@@ -11,7 +11,9 @@ from petitRADTRANS.spectral_model import SpectralModel
 from petitRADTRANS.math import resolving_space
 from petitRADTRANS.planet import Planet
 
-local_path = "/home/danny/exoplanet_atmospheres/code"
+home_path = os.environ["HOME"]
+
+local_path = home_path + "/exoplanet_atmospheres/code"
 
 wasp121b_spectrum = np.load(
     os.path.join(local_path, "wasp121b.npz")
@@ -183,26 +185,12 @@ ax[1].pcolormesh(wl, orbital_phase_pre_eclipse, spectrum_pre_eclipse)
 fig.supxlabel(r"Wavelengths ($\mu$m)")
 fig.supylabel(r"Orbital Phase")
 
-# fig, ax = plt.subplots(2, sharex="all", sharey="all")
-# fig.suptitle("Spectrum 100")
-# fig.supxlabel(r"Wavelength ($\mu$m)")
-# fig.supylabel(r"Flux ($\Delta$F)")
-# ax[0].plot(wl, convolved_spectrum_pre_eclipse[100])
-# ax[0].set_title("Convolved Spectrum")
-# ax[1].set_title("Uncovolved Spectrum")
-# ax[1].plot(wl, spectrum_pre_eclipse[100])
-
-
 vsys = np.linspace(-200, 200, 1000)
 orbital_phase_full = np.linspace(0, 1, 1000)
 Wl_post = np.outer(1 - vsys * 1000 / const.c.value, wl)
 flux_model = scisig.fftconvolve(flux, ref_kernel, "same")
 
 shifted_templates_pre = np.interp(Wl_post, wl, flux_model)
-
-# fig, ax = plt.subplots()
-# ax.imshow(shifted_templates, aspect="auto")
-# ax.pcolormesh(wl, orbital_phase_full, shifted_templates)
 
 CC = np.dot(convolved_spectrum_pre_eclipse, shifted_templates_pre.T)
 
@@ -240,14 +228,6 @@ def Kp_vsys_plotter(K, vsys, op, CC):
 
 K_vsys_map_pre_eclipse = Kp_vsys_plotter(K, vsys, orbital_phase_pre_eclipse, CC)
 
-fig, ax = plt.subplots()
-ax.pcolormesh(vsys, K, K_vsys_map_pre_eclipse)
-ax.set_ylabel(r"$K_p$")
-ax.set_xlabel(r"$v_{\text{sys}}$")
-ax.axhline(Kp, ls="--", color="red", lw=0.5)
-ax.axvline(0, ls="--", color="red", lw=0.5)
-
-
 vp_post_eclipse = Kp * np.sin(orbital_phase_post_eclipse * 2 * np.pi)
 W_post = np.outer(1 - vp_post_eclipse * 1000 / const.c.value, wl)
 spectrum_post_eclipse = np.interp(W_post, wl, flux)
@@ -266,19 +246,6 @@ post_model = np.interp(Wl_post, wl, flux_model)
 
 CC_post = np.dot(convolved_spectrum_post_eclipse, post_model.T)
 K_vsys_map_post_eclipse = Kp_vsys_plotter(K, vsys, orbital_phase_post_eclipse, CC_post)
-
-
-fig, ax = plt.subplots(2)
-ax[0].pcolormesh(vsys, orbital_phase_post_eclipse, CC_post)
-ax[1].pcolormesh(wl, orbital_phase_post_eclipse, convolved_spectrum_post_eclipse)
-
-
-fig, ax = plt.subplots()
-ax.pcolormesh(vsys, K, K_vsys_map_post_eclipse)
-ax.set_ylabel(r"$K_p$")
-ax.set_xlabel(r"$v_{\text{sys}}$")
-ax.axhline(Kp, ls="--", color="red", lw=0.5)
-ax.axvline(0, ls="--", color="red", lw=0.5)
 
 combined_Kp_plot = K_vsys_map_post_eclipse + K_vsys_map_pre_eclipse
 max_lines_pre = np.where(K_vsys_map_pre_eclipse == np.max(K_vsys_map_pre_eclipse))

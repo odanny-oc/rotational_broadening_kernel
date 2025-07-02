@@ -7,9 +7,14 @@ from petitRADTRANS.physics import temperature_profile_function_guillot_global
 from petitRADTRANS.spectral_model import SpectralModel
 from petitRADTRANS.math import resolving_space
 from petitRADTRANS.planet import Planet
-import SysRem
+
+# import SysRem
+
+home_path = os.environ["HOME"]
+local_path = home_path + "/exoplanet_atmospheres/code"
 
 resolution = 200000
+
 
 def black_body(wl, T):
     black_body = (
@@ -92,9 +97,9 @@ ax.set_xlabel(r"Wavelength ($\mu$m)")
 ax.set_ylabel(r"Flux ($\Delta$F)")
 plt.show()
 np.savez(
-    os.path.join("/home/danny/exoplanet_atmospheres/code", "wasp121b.npz"),
+    os.path.join(local_path, "wasp121b.npz"),
     wl=wl[0],
-    flux= rel_flux,
+    flux=rel_flux,
     radius_planet=Rpl * 1e-5,
     radius_star=Rs * 1e-5,
     mass_planet=Mpl * 1e-3,
