@@ -2,12 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from astropy import constants as const
-from petitRADTRANS.radtrans import Radtrans
-from petitRADTRANS.plotlib import plot_radtrans_opacities
 from petitRADTRANS import physical_constants as cst, planet
-from petitRADTRANS.config import petitradtrans_config_parser
 from petitRADTRANS.physics import temperature_profile_function_guillot_global
-import scipy.signal as scisig
 from petitRADTRANS.spectral_model import SpectralModel
 from petitRADTRANS.math import resolving_space
 from petitRADTRANS.planet import Planet
@@ -41,8 +37,6 @@ times = tdur * (np.linspace(-0.5, 0.5, n_exposures))
 orbital_phases = times / period
 mid_transit_time = 0  # (s)
 star_radial_velocity = 0  # (cm.s-1) V_sys
-barycentric_velocities = np.linspace(-13.25e6, -23.55e6, times.size)  # (cm.s-1) V_bary
-# why need a range? acceleration?
 vp = Kp * np.sin(orbital_phases * 2 * np.pi)
 
 # Uncertainties assuming a S/N of 2000
@@ -63,15 +57,15 @@ spectral_model = SpectralModel(
     star_radius=Rs,
     star_mass=Ms,
     transit_duration=tdur,
-    reference_gravity=const.G.value * 0.85 * cst.m_jup / (cst.r_jup_mean) ** 2,
+    reference_gravity=const.G.value * Mp / (Rpl**2),
     reference_pressure=0.01,
     # Star, system, orbit
-    # is_observed=True,  # return the flux observed at system_distance
+    is_observed=True,  # return the flux observed at system_distance
     system_distance=10
     * cst.s_cst.light_year
     * 1e2,  # m to cm, used to scale the spectrum
-    # is_around_star=True,
-    # star_effective_temperature=5500,  # used to get the PHOENIX stellar spectrum model
+    is_around_star=True,
+    star_effective_temperature=5500,  # used to get the PHOENIX stellar spectrum model
     # Temperature profile parameters
     temperature_profile_mode="guillot",
     temperature=2500,
@@ -107,9 +101,17 @@ spectral_model = SpectralModel(
     uncertainties=data_uncertainties,
 )
 
-wl, transit_radii = spectral_model.calculate_spectrum(
-    mode="emission",
-    scale=True,
-)
+wl, flux = spectral_model.calculate_spectrum(mode="emission")
+wl *= 1e4
+flux -= np.mean(flux)
 
-np.savez("Fe_spectrumwl.npz", wl=wl, flux=transit_radii)
+fig, ax = plt.subplots()
+ax.plot(wl[0], flux[0])
+ax.set_xlabel(r"Wavelength ($\mu$m)")
+ax.set_ylabel(r"Flux ($\Delta$F)")
+plt.show()
+np.savez(
+    os.path.join("/home/danny/exoplanet_atmospheres/code", "Fe_spectrum.npz"),
+    wl=wl[0],
+    flux=flux[0],
+)

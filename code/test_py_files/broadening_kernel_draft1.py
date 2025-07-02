@@ -16,7 +16,6 @@ planet = Planet.get("HD 189733 b")
 resolution = 80000
 
 
-
 def wl_rspace(w_min, w_max, R):
     """
 
@@ -183,9 +182,8 @@ spectral_model = SpectralModel(
 
 noise_matrix = np.random.default_rng(seed=2786).normal(loc=0, scale=data_uncertainties)
 
-wl, transit_radii = spectral_model.calculate_spectrum(
-    mode="emission"
-)
+wl, transit_radii = spectral_model.calculate_spectrum(mode="emission")
+fig, ax = plt.subplots()
 
 wavelengths_rebinned, transit_radii_rebinned = spectral_model.calculate_spectrum(
     mode="emission",

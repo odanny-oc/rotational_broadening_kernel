@@ -12,6 +12,7 @@ from petitRADTRANS.spectral_model import SpectralModel
 from petitRADTRANS.math import resolving_space
 from petitRADTRANS.planet import Planet
 
+local_path = "/home/danny/exoplanet_atmospheres/code"
 
 # Planet and Star Parameters in cgs!
 
@@ -26,8 +27,10 @@ observer_angle = 90  # degrees
 Kp = 2 * np.pi / period * a * np.sin(observer_angle) / (np.sqrt(1 - eccen**2))
 b = 0.01
 
-tdur = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 - Rpl / Rs) ** 2 - b**2))
-tfull = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 + Rpl / Rs) ** 2 - b**2))
+tdur = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 + Rpl / Rs) ** 2 - b**2))  # Ttot
+tfull = (
+    period / np.pi * np.arcsin(Rs / a * np.sqrt((1 - Rpl / Rs) ** 2 - b**2))
+)  # Tfull
 eclipse_end = 0.5 - tfull / period
 veq = 2 * np.pi * Rpl * 1e-2 / period  # m/s
 
@@ -36,7 +39,6 @@ def broadening_kernel_orbital_phase(x, op):
     if not isinstance(op, np.ndarray):
         op = np.array([op])
     kernel_array = np.zeros(shape=(op.shape[0], x.shape[0]))
-    op_index = 0
     ref_range = np.array([i for i in x if abs(i) <= veq])
     ref_kernel = np.sqrt(1 - (ref_range / veq) ** 2)
     ref_padding = abs(x.shape[0] - ref_range.shape[0]) // 2
@@ -44,15 +46,43 @@ def broadening_kernel_orbital_phase(x, op):
     normaliser = np.sum(ref_kernel)
     ref_kernel /= normaliser
     ref_kernel[: x.shape[0] // 2] = np.zeros(x.shape[0] // 2)
+    period_scaler = period / (4 * (tdur - tfull) / 2)
 
     for i, op_i in enumerate(op):
-        ref_op = op_i
-        vel = veq * np.sin(2 * np.pi * ref_op + np.pi / 2)
-        if vel == 0:
-            kernel = np.zeros(x.shape[0])
-            print("Velcity is zero!")
+        if op_i < 0:
+            ref_op = op_i + 1
         else:
-
+            ref_op = op_i
+        vel = veq * np.cos(2 * np.pi * ref_op)
+        if vel == 0:
+            kernel = ref_kernel
+            if ref_op < 0.5:
+                kernel = np.flip(kernel)
+        elif abs(ref_op - 0.5) < tdur / (2 * period) or abs(ref_op + 0.5) < tdur / (
+            2 * period
+        ):
+            if abs(ref_op - 0.5) < tfull / (2 * period) or abs(ref_op + 0.5) < tfull / (
+                2 * period
+            ):
+                kernel = np.zeros(x.shape[0])
+            else:
+                if ref_op > 0:
+                    vel = veq * np.cos((2 * np.pi * (ref_op - 0.5)) * (period_scaler))
+                else:
+                    vel = veq * np.cos((2 * np.pi * (ref_op + 0.5)) * (period_scaler))
+                range = np.array([i for i in x if abs(i) <= abs(vel)])
+                kernel = np.sqrt(1 - (range / abs(vel)) ** 2) / normaliser
+                padding = abs(x.shape[0] - range.shape[0]) // 2
+                kernel = np.pad(kernel, padding, "constant")
+                if vel < 0:
+                    kernel[x.shape[0] // 2 :] = np.zeros(x.shape[0] // 2 + 1)
+                    kernel += ref_kernel
+                if vel > 0:
+                    kernel[: x.shape[0] // 2] = np.zeros(x.shape[0] // 2)
+                    kernel = ref_kernel - kernel
+                if ref_op > 0.5:
+                    kernel = np.flip(kernel)
+        else:
             range = np.array([i for i in x if abs(i) <= abs(vel)])
             kernel = np.sqrt(1 - (range / abs(vel)) ** 2) / normaliser
             padding = abs(x.shape[0] - range.shape[0]) // 2
@@ -63,7 +93,7 @@ def broadening_kernel_orbital_phase(x, op):
             if vel > 0:
                 kernel[: x.shape[0] // 2] = np.zeros(x.shape[0] // 2)
                 kernel = ref_kernel - kernel
-            if op_i > 0:
+            if ref_op < 0.5:
                 kernel = np.flip(kernel)
         kernel_array[i] = kernel
     if kernel_array.shape[0] == 1:
@@ -79,37 +109,35 @@ n_exposure = 150
 kernel_res = n_exposure // 2
 range_vel = 0.07
 
-# orbital_phase = np.linspace(
-#     -0.5 + tfull / period, 0.5 - tfull / period, n_exposure
-# )  # time/period
-
 orbital_phase = np.linspace(0.35, 0.5 - tfull / period, n_exposure)  # time/period
 
 x = np.linspace(-range_vel, range_vel, points_number) * (points_number // 2) * dv
 
 time_dependent_broadening_kernels = broadening_kernel_orbital_phase(x, orbital_phase)
-n_columns = 10
-n_rows = int(n_exposure / n_columns)
-row = 0
-column = 0
-fig, ax = plt.subplots(n_rows, n_columns, figsize=(10, 5), sharey="all")
-for i in time_dependent_broadening_kernels:
-    ax[row][column].plot(i)
-    column += 1
-    column = column % n_columns
-    if column == 0:
-        row += 1
-        row = row % n_rows
 
-fig, ax = plt.subplots()
-ax.plot(x, broadening_kernel_orbital_phase(x, 0.234))
+# ecclipse_phase = np.linspace(0, 1, n_exposure)
+# ecclipse_kernels = broadening_kernel_orbital_phase(x, ecclipse_phase)
+# n_columns = 10
+# n_rows = int(n_exposure / n_columns)
+# row = 0
+# column = 0
+# fig, ax = plt.subplots(n_rows, n_columns, figsize=(10, 5), sharey="all")
+# for index, i in enumerate(ecclipse_kernels):
+#     ax[row][column].plot(i, label=f"{index + 1}. {ecclipse_phase[index]:.4f}")
+#     column += 1
+#     column = column % n_columns
+#     if column == 0:
+#         row += 1
+#         row = row % n_rows
+# fig.legend()
 
-wl, flux = np.load("Fe_spectrumwl.npy")
-flux -= np.mean(flux)
-# fig, ax = plt.subplots()
-# ax.plot(wl, flux)
-#
-#
+
+fe_spectrum = np.load(
+    os.path.join(local_path, "Fe_spectrum.npz")
+)  # relative flux (normalised) and wavelength in microns
+wl = fe_spectrum["wl"]
+flux = fe_spectrum["flux"]
+
 Kp = 293
 vp = Kp * np.sin(orbital_phase * 2 * np.pi)
 W = np.outer(1 - vp * 1000 / const.c.value, wl)
@@ -122,7 +150,6 @@ for i in range(n_exposure):
         doppler_shift[i], time_dependent_broadening_kernels[i], "same"
     )
 
-wl *= 1e4
 fig, ax = plt.subplots(2, sharex="all", sharey="all")
 ax[0].pcolormesh(wl, orbital_phase, convolved_spectrum)
 ax[1].pcolormesh(wl, orbital_phase, doppler_shift)
@@ -130,9 +157,20 @@ fig.supxlabel(r"Wavelengths ($\mu$m)")
 fig.supylabel(r"Orbital Phase")
 
 vsys = np.linspace(-Kp, Kp, 1000)
+orbital_phase_full = np.linspace(0, 1, 1000)
+# vsys = Kp * np.sin(2 * np.pi * orbital_phase_full)
 Wl = np.outer(1 - vsys * 1000 / const.c.value, wl)
 shifted_templates = np.interp(Wl, wl, flux)
 
+# kernel = broadening_kernel_orbital_phase(x, orbital_phase_full)
+
+# for i, vel in enumerate(vsys):
+#     shifted_templates[i] = scisig.fftconvolve(shifted_templates[i], kernel[i], "same")
+
+
+fig, ax = plt.subplots()
+# ax.imshow(shifted_templates, aspect='auto')
+ax.pcolormesh(wl, orbital_phase_full, shifted_templates)
 
 CC = np.dot(convolved_spectrum, shifted_templates.T)
 
@@ -154,7 +192,7 @@ ax[2].plot(vsys, cc_sum)
 ax[2].set_xlabel("System Velocity (km/s)")
 ax[2].set_ylabel("Cross Correlation Sum")
 
-K = np.linspace(-100, 2 * Kp, 1000)
+K = np.linspace(0, 2 * Kp, 1000)
 
 K_vsys_map = np.empty((K.size, vsys.size))
 
@@ -172,8 +210,8 @@ fig, ax = plt.subplots()
 ax.pcolormesh(vsys, K, K_vsys_map)
 ax.set_ylabel(r"$K_p$")
 ax.set_xlabel(r"$v_{\text{sys}}$")
-ax.axhline(Kp, ls="--", color="red", lw = 0.5)
-ax.axvline(0, ls="--", color="red", lw = 0.5)
+ax.axhline(Kp, ls="--", color="red", lw=0.5)
+ax.axvline(0, ls="--", color="red", lw=0.5)
 
 
 plt.show()
