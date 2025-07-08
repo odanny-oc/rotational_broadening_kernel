@@ -14,13 +14,24 @@ swaetha paper
 to do:
 WASP121-b thermal inversions
 model for day and night side (h2o and co)
+
 Kp difference plot?
 
 planet star : 2 pi Rpl^2 flux/(2 pi Rst^2 pi bb)
 
 sysrem uniform noise
 
+noise
 orders
+
+
+odd number points Kp vsys
+day-night CC
+
+day side comparison 
+flux day + night
+higher res
+wavelength grid !!
 
 
 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
