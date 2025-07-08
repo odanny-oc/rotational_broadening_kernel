@@ -7,6 +7,7 @@ from petitRADTRANS.physics import temperature_profile_function_guillot_global
 from petitRADTRANS.spectral_model import SpectralModel
 from petitRADTRANS.math import resolving_space
 from petitRADTRANS.planet import Planet
+from petitRADTRANS.config import petitradtrans_config_parser
 
 # import SysRem
 

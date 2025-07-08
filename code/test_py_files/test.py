@@ -5,21 +5,21 @@ from petitRADTRANS.radtrans import Radtrans
 from petitRADTRANS import physical_constants as cst
 from petitRADTRANS.config import petitradtrans_config_parser
 
-mpl.rcParams.update({
-    "pgf.texsystem": "pdflatex",
-    "font.family": "serif",
-    "text.usetex": True,
-    "pgf.rcfonts": False,
-    "font.size": 15,
-    "figure.figsize": [20, 15],
-    "axes.facecolor": (1.0 ,1.0, 1.0, 1.0),
-    "savefig.facecolor": (1.0 ,1.0, 1.0, 1.0)
-})
+# mpl.rcParams.update({
+#     "pgf.texsystem": "pdflatex",
+#     "font.family": "serif",
+#     "text.usetex": True,
+#     "pgf.rcfonts": False,
+#     "font.size": 15,
+#     "figure.figsize": [20, 15],
+#     "axes.facecolor": (1.0 ,1.0, 1.0, 1.0),
+#     "savefig.facecolor": (1.0 ,1.0, 1.0, 1.0)
+# })
 
-notes_directory = r"/home/danny/exoplanet_atmospheres/notes/"
-input_data_path = r'/home/danny/petitRADTRANS/input_data'
-
-
+# notes_directory = r"/home/danny/exoplanet_atmospheres/notes/"
+input_data_path = r'/home/ocean/petitRADTRANS/input_data'
+#
+#
 petitradtrans_config_parser.set_input_data_path(input_data_path)
 
 radtrans = Radtrans(
@@ -74,5 +74,5 @@ ax.set_xscale('log')
 ax.set_xlabel('Wavelength [microns]')
 ax.set_ylabel(r'Transit radius [$\rm R_{Jup}$]')
 
-# plt.show()
-plt.savefig(notes_directory + "transmission1.svg", transparent = True)
+plt.show()
+# plt.savefig(notes_directory + "transmission1.svg", transparent = True)
