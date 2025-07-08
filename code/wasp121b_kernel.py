@@ -23,6 +23,11 @@ wasp121b_spectrum = np.load(
     os.path.join(local_path, "wasp121b.npz")
 )  # relative flux (normalised) and wavelength in microns
 
+wasp121_post_data = np.load(
+    local_path + "/crires_posteclipse_WASP121_2021-12-15_processed.npz"
+)
+wavelength_grid = wasp121_post_data["W"][8] * 1e-4  # resolution ~ 300000
+
 
 # Planet and Star Parameters
 # SI (and km)
@@ -121,7 +126,7 @@ def broadening_kernel_orbital_phase(x, op):
         return kernel_array, full_kernel
 
 
-resolution = 200000
+resolution = 400000
 dv = const.c.value * 1e-3 / resolution
 points_number = 51
 n_exposure = 300
@@ -161,12 +166,17 @@ time_dependent_broadening_kernels_post_eclipse, ref_kernel = (
 wl = wasp121b_spectrum["wl"]
 flux = wasp121b_spectrum["flux"]
 
-index_start = np.where(np.isclose(wl, 2.09))[0][0]
-index_end = np.where(np.isclose(wl, 2.1))[0][0]
-wl = wl[index_start:index_end]
-flux = flux[index_start:index_end]
+# index_start = np.where(np.isclose(wl, 2.09))[0][0]
+# index_end = np.where(np.isclose(wl, 2.1))[0][0]
+# wl = wl[index_start:index_end]
+# flux = flux[index_start:index_end]
+print(wl)
+print(flux)
 flux -= np.mean(flux)
-
+print(wavelength_grid)
+fig, ax = plt.subplots()
+test_flux = np.interp(wavelength_grid, wl , flux) 
+ax.plot(wavelength_grid, test_flux)
 
 vp_pre_eclipse = Kp * np.sin(orbital_phase_pre_eclipse * 2 * np.pi)
 W_pre = np.outer(1 - vp_pre_eclipse * 1000 / const.c.value, wl)
@@ -182,6 +192,13 @@ for i in range(n_exposure):
         "same",
     )
 
+convolved_spectrum_pre_eclipse = Time_Dependent_Spectrum(
+    wl,
+    flux,
+    orbital_phase_pre_eclipse,
+    Kp,
+    time_dependent_broadening_kernels_pre_eclipse,
+)
 
 fig, ax = plt.subplots(2, sharex="all", sharey="all")
 ax[0].pcolormesh(wl, orbital_phase_pre_eclipse, convolved_spectrum_pre_eclipse)
@@ -190,23 +207,24 @@ fig.supxlabel(r"Wavelengths ($\mu$m)")
 fig.supylabel(r"Orbital Phase")
 
 vsys = np.linspace(-200, 200, 1000)
-orbital_phase_full = np.linspace(0, 1, 1000)
-Wl_post = np.outer(1 - vsys * 1000 / const.c.value, wl)
-flux_model = scisig.fftconvolve(flux, ref_kernel, "same")
 
-shifted_templates_pre = np.interp(Wl_post, wl, flux_model)
+CC_pre = Cross_Correlator(wl, flux, vsys * 1000, convolved_spectrum_pre_eclipse)
 
-CC = np.dot(convolved_spectrum_pre_eclipse, shifted_templates_pre.T)
+K = np.linspace(0, 2 * Kp, 1000)
+
+K_vsys_map_pre_eclipse, CC_shifted = Kp_vsys_Plotter(
+    K, vsys, orbital_phase_pre_eclipse, CC_pre
+)
 
 fig, ax = plt.subplots(3)
-ax[0].pcolormesh(vsys, orbital_phase_pre_eclipse, CC)
+ax[0].pcolormesh(vsys, orbital_phase_pre_eclipse, CC_pre)
 ax[0].set_xlabel("System Velocity (km/s)")
 ax[0].set_ylabel("Orbital Phase")
 
-CC_shifted = np.empty(CC.shape)
-for i, vel in enumerate(vp_pre_eclipse):
-    CC_shifted[i] = np.interp(vsys + vel, vsys, CC[i])
-cc_sum = np.sum(CC_shifted, axis=0)
+
+index = 500
+CC_shifted = CC_shifted[index]
+cc_sum = K_vsys_map_pre_eclipse[index]
 
 ax[1].pcolormesh(vsys, orbital_phase_pre_eclipse, CC_shifted)
 ax[1].set_xlabel("System Velocity (km/s)")
@@ -216,40 +234,17 @@ ax[2].plot(vsys, cc_sum)
 ax[2].set_xlabel("System Velocity (km/s)")
 ax[2].set_ylabel("Cross Correlation Sum")
 
-K = np.linspace(0, 2 * Kp, 1000)
 
+K_vsys_map_pre_eclipse, _ = Kp_vsys_Plotter(K, vsys, orbital_phase_pre_eclipse, CC_pre)
 
-def Kp_vsys_plotter(K, vsys, op, CC):
-    K_vsys_map = np.empty((K.size, vsys.size))
-    CC_array = np.empty(CC.shape)
-    for i, kp in enumerate(K):
-        vp = kp * np.sin(2 * np.pi * op)
-        for j, vel in enumerate(vp):
-            CC_array[j] = np.interp(vsys + vel, vsys, CC[j])
-        K_vsys_map[i] = np.sum(CC_array, axis=0)
-    return K_vsys_map
+convolved_spectrum_post_eclipse = Time_Dependent_Spectrum(
+    wl, flux, orbital_phase_post_eclipse, Kp, time_dependent_broadening_kernels_post_eclipse)
 
+CC_post = Cross_Correlator(wl, flux, vsys * 1000, convolved_spectrum_post_eclipse)
 
-K_vsys_map_pre_eclipse = Kp_vsys_plotter(K, vsys, orbital_phase_pre_eclipse, CC)
-
-vp_post_eclipse = Kp * np.sin(orbital_phase_post_eclipse * 2 * np.pi)
-W_post = np.outer(1 - vp_post_eclipse * 1000 / const.c.value, wl)
-spectrum_post_eclipse = np.interp(W_post, wl, flux)
-
-convolved_spectrum_post_eclipse = np.zeros_like(spectrum_post_eclipse)
-
-for i in range(n_exposure):
-    convolved_spectrum_post_eclipse[i] = scisig.fftconvolve(
-        spectrum_post_eclipse[i],
-        time_dependent_broadening_kernels_post_eclipse[i],
-        "same",
-    )
-
-Wl_post = np.outer(1 - vsys * 1000 / const.c.value, wl)
-post_model = np.interp(Wl_post, wl, flux_model)
-
-CC_post = np.dot(convolved_spectrum_post_eclipse, post_model.T)
-K_vsys_map_post_eclipse = Kp_vsys_plotter(K, vsys, orbital_phase_post_eclipse, CC_post)
+K_vsys_map_post_eclipse, _ = Kp_vsys_Plotter(
+    K, vsys, orbital_phase_post_eclipse, CC_post
+)
 
 combined_Kp_plot = K_vsys_map_post_eclipse + K_vsys_map_pre_eclipse
 max_lines_pre = np.where(K_vsys_map_pre_eclipse == np.max(K_vsys_map_pre_eclipse))
@@ -271,8 +266,8 @@ ax[0].axhline(Kp_from_plot, ls="--", color="orange", lw=0.5)
 ax[0].axvline(vsys[max_lines[1][0]], ls="--", color="orange", lw=0.5)
 
 unconvolved_spec_pre, _ = Kp_vsys_Map_from_Flux(
-        wl, flux, orbital_phase_pre_eclipse, vsys, Kp
-        )
+    wl, flux, orbital_phase_pre_eclipse, vsys, Kp
+)
 
 unconvolved_spec_post, _ = Kp_vsys_Map_from_Flux(
     wl, flux, orbital_phase_post_eclipse, vsys, Kp
@@ -280,11 +275,17 @@ unconvolved_spec_post, _ = Kp_vsys_Map_from_Flux(
 
 total_unconvolved_spec = unconvolved_spec_pre + unconvolved_spec_post
 
-ax[1].pcolormesh(vsys, K,total_unconvolved_spec)
+ax[1].pcolormesh(vsys, K, total_unconvolved_spec)
 # ax[1].imshow(combined_Kp_plot, aspect="auto")
 ax[1].axhline(Kp, ls="--", color="red", lw=0.5)
 ax[1].axvline(0, ls="--", color="red", lw=0.5)
-ax[1].axhline(Kp[np.where(total_unconvolved_spec == np.max(total_unconvolved_spec))[0][0]], ls="--", color="orange", lw=0.5)
+ax[1].axhline(
+    K[np.where(total_unconvolved_spec == np.max(total_unconvolved_spec))[0][0]],
+    ls="--",
+    color="orange",
+    lw=0.5,
+)
+
 
 def gaussian(x, sigma):
     return np.exp(-0.5 * (x / sigma) ** 2)
