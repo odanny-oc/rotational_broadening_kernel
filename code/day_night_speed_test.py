@@ -1,10 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-from functions import Time_Dependent_Spectrum
-from functions import Cross_Correlator
-from functions import Kp_vsys_Plotter
-from functions import Kp_vsys_Map_from_Flux
+from functions import Kp_vsys_Plotter as Kplotter
 from astropy import constants as const
 from petitRADTRANS.plotlib import plot_radtrans_opacities
 from petitRADTRANS import physical_constants as cst, planet
@@ -14,29 +11,30 @@ import scipy.signal as scisig
 from petitRADTRANS.spectral_model import SpectralModel
 from petitRADTRANS.math import resolving_space
 from petitRADTRANS.planet import Planet
+import time
 
 home_path = os.environ["HOME"]
 
 local_path = home_path + "/exoplanet_atmospheres/code"
 
-wasp121b_spectrum = np.load(
-    os.path.join(local_path, "wasp121b.npz")
+day_night_atmosphere = np.load(
+    os.path.join(local_path, "day_night_atmosphere.npz")
 )  # relative flux (normalised) and wavelength in microns
 
 
 # Planet and Star Parameters
 # SI (and km)
 
-Rpl = wasp121b_spectrum["radius_planet"]
-Rs = wasp121b_spectrum["radius_star"]
-Mpl = wasp121b_spectrum["mass_planet"]
-Ms = wasp121b_spectrum["mass_star"]
-a = wasp121b_spectrum["semi_major_axis"]
-period = wasp121b_spectrum["period"]
+Rpl = day_night_atmosphere["radius_planet"]
+Rs = day_night_atmosphere["radius_star"]
+Mpl = day_night_atmosphere["mass_planet"]
+Ms = day_night_atmosphere["mass_star"]
+a = day_night_atmosphere["semi_major_axis"]
+period = day_night_atmosphere["period"]
 eccen = 0
-observer_angle = wasp121b_spectrum["observer_angle"]
+observer_angle = day_night_atmosphere["observer_angle"]
 Kp = 2 * np.pi / period * a * np.sin(observer_angle) / (np.sqrt(1 - eccen**2))
-b = wasp121b_spectrum["impact_parameter"]
+b = day_night_atmosphere["impact_parameter"]
 
 tdur = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 + Rpl / Rs) ** 2 - b**2))  # Ttot
 tfull = (
@@ -137,66 +135,65 @@ time_dependent_broadening_kernels_pre_eclipse, ref_kernel = (
     broadening_kernel_orbital_phase(x, orbital_phase_pre_eclipse)
 )
 
+anti_kernels_pre_eclipse, ref_kernel = broadening_kernel_orbital_phase(
+    x, orbital_phase_pre_eclipse - 0.5
+)
+
 time_dependent_broadening_kernels_post_eclipse, ref_kernel = (
     broadening_kernel_orbital_phase(x, orbital_phase_post_eclipse)
 )
+anti_kernels_post_eclipse, ref_kernel = broadening_kernel_orbital_phase(
+    x, orbital_phase_post_eclipse - 0.5
+)
 
-# ecclipse_phase = np.linspace(0, 1, n_exposure)
-# ecclipse_kernels = broadening_kernel_orbital_phase(x, ecclipse_phase)
-# n_columns = 10
-# n_rows = n_exposure // n_columns
-# row = 0
-# column = 0
-# fig, ax = plt.subplots(n_rows, n_columns, figsize=(10, 5), sharey="all")
-# for index, i in enumerate(time_dependent_broadening_kernels):
-#     ax[row][column].plot(x, i, label=f"{index + 1}. {orbital_phase[index]:.4f}")
-#     column += 1
-#     column = column % n_columns
-#     if column == 0:
-#         row += 1
-#         row = row % n_rows
-# fig.legend()
-#
+wl = day_night_atmosphere["wl_day"]
 
-wl = wasp121b_spectrum["wl"]
-flux = wasp121b_spectrum["flux"]
+flux_day = day_night_atmosphere["flux_day"]
+flux_night = day_night_atmosphere["flux_night"]
 
-index_start = np.where(np.isclose(wl, 2.09))[0][0]
-index_end = np.where(np.isclose(wl, 2.1))[0][0]
-wl = wl[index_start:index_end]
-flux = flux[index_start:index_end]
-flux -= np.mean(flux)
-
+flux_day -= np.mean(flux_day)
+flux_night -= np.mean(flux_night)
 
 vp_pre_eclipse = Kp * np.sin(orbital_phase_pre_eclipse * 2 * np.pi)
 W_pre = np.outer(1 - vp_pre_eclipse * 1000 / const.c.value, wl)
-spectrum_pre_eclipse = np.interp(W_pre, wl, flux)
+spectrum_pre_eclipse_day = np.interp(W_pre, wl, flux_day)
+spectrum_pre_eclipse_night = np.interp(W_pre, wl, flux_night)
 
-
-convolved_spectrum_pre_eclipse = np.zeros_like(spectrum_pre_eclipse)
+convolved_spectrum_pre_eclipse_day = np.zeros_like(spectrum_pre_eclipse_day)
+convolved_spectrum_pre_eclipse_night = np.zeros_like(spectrum_pre_eclipse_night)
 
 for i in range(n_exposure):
-    convolved_spectrum_pre_eclipse[i] = scisig.fftconvolve(
-        spectrum_pre_eclipse[i],
+    convolved_spectrum_pre_eclipse_day[i] = scisig.fftconvolve(
+        spectrum_pre_eclipse_day[i],
         time_dependent_broadening_kernels_pre_eclipse[i],
         "same",
     )
 
+for i in range(n_exposure):
+    convolved_spectrum_pre_eclipse_night[i] = scisig.fftconvolve(
+        spectrum_pre_eclipse_night[i],
+        anti_kernels_pre_eclipse[i],
+        "same",
+    )
 
-fig, ax = plt.subplots(2, sharex="all", sharey="all")
-ax[0].pcolormesh(wl, orbital_phase_pre_eclipse, convolved_spectrum_pre_eclipse)
-ax[1].pcolormesh(wl, orbital_phase_pre_eclipse, spectrum_pre_eclipse)
-fig.supxlabel(r"Wavelengths ($\mu$m)")
-fig.supylabel(r"Orbital Phase")
+total_convolved_spectrum_pre = (
+    convolved_spectrum_pre_eclipse_night + convolved_spectrum_pre_eclipse_day
+)
+
+# fig, ax = plt.subplots()
+# ax.pcolormesh(wl, orbital_phase_pre_eclipse, total_convolved_spectrum)
+# fig.supxlabel(r"Wavelengths ($\mu$m)")
+# fig.supylabel(r"Orbital Phase")
+# plt.show()
 
 vsys = np.linspace(-200, 200, 1000)
 orbital_phase_full = np.linspace(0, 1, 1000)
 Wl_post = np.outer(1 - vsys * 1000 / const.c.value, wl)
-flux_model = scisig.fftconvolve(flux, ref_kernel, "same")
+flux_model = scisig.fftconvolve(flux_day + flux_night, ref_kernel, "same")
 
 shifted_templates_pre = np.interp(Wl_post, wl, flux_model)
 
-CC = np.dot(convolved_spectrum_pre_eclipse, shifted_templates_pre.T)
+CC = np.dot(total_convolved_spectrum_pre, shifted_templates_pre.T)
 
 fig, ax = plt.subplots(3)
 ax[0].pcolormesh(vsys, orbital_phase_pre_eclipse, CC)
@@ -229,26 +226,42 @@ def Kp_vsys_plotter(K, vsys, op, CC):
         K_vsys_map[i] = np.sum(CC_array, axis=0)
     return K_vsys_map
 
-
+start_time = time.time()
 K_vsys_map_pre_eclipse = Kp_vsys_plotter(K, vsys, orbital_phase_pre_eclipse, CC)
+print("Kplotter --- %s seconds ---" % (time.time() - start_time))
+
+
+start_time = time.time()
+K_vsys_map_pre_eclipse = Kplotter(K, vsys, orbital_phase_pre_eclipse, CC)
+print("Kplotter import --- %s seconds ---" % (time.time() - start_time))
 
 vp_post_eclipse = Kp * np.sin(orbital_phase_post_eclipse * 2 * np.pi)
 W_post = np.outer(1 - vp_post_eclipse * 1000 / const.c.value, wl)
-spectrum_post_eclipse = np.interp(W_post, wl, flux)
+spectrum_post_eclipse_day = np.interp(W_post, wl, flux_day)
+spectrum_post_eclipse_night = np.interp(W_post, wl, flux_night)
 
-convolved_spectrum_post_eclipse = np.zeros_like(spectrum_post_eclipse)
+convolved_spectrum_post_eclipse_day = np.zeros_like(spectrum_post_eclipse_day)
+convolved_spectrum_post_eclipse_night = np.zeros_like(spectrum_post_eclipse_night)
 
 for i in range(n_exposure):
-    convolved_spectrum_post_eclipse[i] = scisig.fftconvolve(
-        spectrum_post_eclipse[i],
+    convolved_spectrum_post_eclipse_day[i] = scisig.fftconvolve(
+        spectrum_post_eclipse_day[i],
         time_dependent_broadening_kernels_post_eclipse[i],
         "same",
     )
 
+for i in range(n_exposure):
+    convolved_spectrum_post_eclipse_night[i] = scisig.fftconvolve(
+        spectrum_post_eclipse_night[i],
+        anti_kernels_post_eclipse[i],
+        "same",
+    )
+
+total_convolved_spectrum_post = convolved_spectrum_post_eclipse_day + convolved_spectrum_post_eclipse_night
 Wl_post = np.outer(1 - vsys * 1000 / const.c.value, wl)
 post_model = np.interp(Wl_post, wl, flux_model)
 
-CC_post = np.dot(convolved_spectrum_post_eclipse, post_model.T)
+CC_post = np.dot(total_convolved_spectrum_post, post_model.T)
 K_vsys_map_post_eclipse = Kp_vsys_plotter(K, vsys, orbital_phase_post_eclipse, CC_post)
 
 combined_Kp_plot = K_vsys_map_post_eclipse + K_vsys_map_pre_eclipse
@@ -260,34 +273,19 @@ Kp_from_plot = K[max_lines[0][0]]
 Kp_from_plot_pre = K[max_lines_pre[0][0]]
 Kp_from_plot_post = K[max_lines_post[0][0]]
 
-fig, ax = plt.subplots(2)
-ax[0].pcolormesh(vsys, K, combined_Kp_plot)
-# ax[0].imshow(combined_Kp_plot, aspect="auto")
-fig.supylabel(r"$K_p$")
-fig.supxlabel(r"$v_{\text{sys}}$")
-ax[0].axhline(Kp, ls="--", color="red", lw=0.5)
-ax[0].axvline(0, ls="--", color="red", lw=0.5)
-ax[0].axhline(Kp_from_plot, ls="--", color="orange", lw=0.5)
-ax[0].axvline(vsys[max_lines[1][0]], ls="--", color="orange", lw=0.5)
-
-unconvolved_spec_pre, _ = Kp_vsys_Map_from_Flux(
-        wl, flux, orbital_phase_pre_eclipse, vsys, Kp
-        )
-
-unconvolved_spec_post, _ = Kp_vsys_Map_from_Flux(
-    wl, flux, orbital_phase_post_eclipse, vsys, Kp
+fig, ax = plt.subplots()
+ax.pcolormesh(vsys, K, combined_Kp_plot)
+# ax.imshow(combined_Kp_plot, aspect="auto")
+ax.set_ylabel(r"$K_p$")
+ax.set_xlabel(r"$v_{\text{sys}}$")
+ax.axhline(Kp, ls="--", color="red", lw=0.5)
+ax.axvline(0, ls="--", color="red", lw=0.5)
+ax.axhline(Kp_from_plot, ls="--", color="blue", lw=0.5)
+ax.axvline(vsys[max_lines[1][0]], ls="--", color="blue", lw=0.5)
+plt.legend(
+    edgecolor="k",
+    facecolor="w",
+    framealpha=1,
+    fancybox=True,
 )
-
-total_unconvolved_spec = unconvolved_spec_pre + unconvolved_spec_post
-
-ax[1].pcolormesh(vsys, K,total_unconvolved_spec)
-# ax[1].imshow(combined_Kp_plot, aspect="auto")
-ax[1].axhline(Kp, ls="--", color="red", lw=0.5)
-ax[1].axvline(0, ls="--", color="red", lw=0.5)
-ax[1].axhline(Kp[np.where(total_unconvolved_spec == np.max(total_unconvolved_spec))[0][0]], ls="--", color="orange", lw=0.5)
-
-def gaussian(x, sigma):
-    return np.exp(-0.5 * (x / sigma) ** 2)
-
-
 plt.show()
