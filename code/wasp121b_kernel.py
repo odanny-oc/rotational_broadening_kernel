@@ -6,10 +6,6 @@ from functions import Cross_Correlator
 from functions import Kp_vsys_Plotter
 from functions import Kp_vsys_Map_from_Flux
 from astropy import constants as const
-from petitRADTRANS.plotlib import plot_radtrans_opacities
-from petitRADTRANS import physical_constants as cst, planet
-from petitRADTRANS.config import petitradtrans_config_parser
-from petitRADTRANS.physics import temperature_profile_function_guillot_global
 import scipy.signal as scisig
 from petitRADTRANS.spectral_model import SpectralModel
 from petitRADTRANS.math import resolving_space
@@ -131,7 +127,7 @@ dv = const.c.value * 1e-3 / resolution
 points_number = 51
 n_exposure = 300
 kernel_res = n_exposure // 2
-range_vel = 0.2
+range_vel = 1.0
 
 orbital_phase_pre_eclipse = np.linspace(0.334, 0.425, n_exposure)  # time/period
 orbital_phase_post_eclipse = np.linspace(0.539, 0.626, n_exposure)  # time/period
@@ -153,44 +149,27 @@ time_dependent_broadening_kernels_post_eclipse, ref_kernel = (
 # row = 0
 # column = 0
 # fig, ax = plt.subplots(n_rows, n_columns, figsize=(10, 5), sharey="all")
-# for index, i in enumerate(time_dependent_broadening_kernels):
-#     ax[row][column].plot(x, i, label=f"{index + 1}. {orbital_phase[index]:.4f}")
+# for i in time_dependent_broadening_kernels_pre_eclipse:
+#     ax[row][column].plot(x, i)
 #     column += 1
 #     column = column % n_columns
 #     if column == 0:
 #         row += 1
 #         row = row % n_rows
-# fig.legend()
-#
 
 wl = wasp121b_spectrum["wl"]
 flux = wasp121b_spectrum["flux"]
-
-# index_start = np.where(np.isclose(wl, 2.09))[0][0]
-# index_end = np.where(np.isclose(wl, 2.1))[0][0]
-# wl = wl[index_start:index_end]
-# flux = flux[index_start:index_end]
-print(wl)
-print(flux)
 flux -= np.mean(flux)
-print(wavelength_grid)
-fig, ax = plt.subplots()
-test_flux = np.interp(wavelength_grid, wl , flux) 
-ax.plot(wavelength_grid, test_flux)
+
+fitted_flux = np.interp(wavelength_grid, wl, flux)
+
+# fig, ax = plt.subplots(2)
+# ax[0].plot(wavelength_grid, fitted_flux)
+# ax[1].plot(wl, flux)
 
 vp_pre_eclipse = Kp * np.sin(orbital_phase_pre_eclipse * 2 * np.pi)
-W_pre = np.outer(1 - vp_pre_eclipse * 1000 / const.c.value, wl)
+W_pre = np.outer(1 - vp_pre_eclipse * 1000 / const.c.value, wavelength_grid)
 spectrum_pre_eclipse = np.interp(W_pre, wl, flux)
-
-
-convolved_spectrum_pre_eclipse = np.zeros_like(spectrum_pre_eclipse)
-
-for i in range(n_exposure):
-    convolved_spectrum_pre_eclipse[i] = scisig.fftconvolve(
-        spectrum_pre_eclipse[i],
-        time_dependent_broadening_kernels_pre_eclipse[i],
-        "same",
-    )
 
 convolved_spectrum_pre_eclipse = Time_Dependent_Spectrum(
     wl,
@@ -198,19 +177,34 @@ convolved_spectrum_pre_eclipse = Time_Dependent_Spectrum(
     orbital_phase_pre_eclipse,
     Kp,
     time_dependent_broadening_kernels_pre_eclipse,
+    wavelength_grid,
 )
 
+fig, ax = plt.subplots()
+full_kernel_flux = scisig.fftconvolve(
+    fitted_flux, broadening_kernel_orbital_phase(x, 0)[1], "same"
+)
+shifted_flux = scisig.fftconvolve(
+    fitted_flux, broadening_kernel_orbital_phase(x, 0.25)[0], "same"
+)
+ax.plot(wavelength_grid, full_kernel_flux)
+ax.plot(wavelength_grid, shifted_flux)
+
 fig, ax = plt.subplots(2, sharex="all", sharey="all")
-ax[0].pcolormesh(wl, orbital_phase_pre_eclipse, convolved_spectrum_pre_eclipse)
-ax[1].pcolormesh(wl, orbital_phase_pre_eclipse, spectrum_pre_eclipse)
+ax[0].pcolormesh(
+    wavelength_grid, orbital_phase_pre_eclipse, convolved_spectrum_pre_eclipse
+)
+ax[1].pcolormesh(wavelength_grid, orbital_phase_pre_eclipse, spectrum_pre_eclipse)
 fig.supxlabel(r"Wavelengths ($\mu$m)")
 fig.supylabel(r"Orbital Phase")
 
-vsys = np.linspace(-200, 200, 1000)
+vsys = np.linspace(-200, 200, 1001)
 
-CC_pre = Cross_Correlator(wl, flux, vsys * 1000, convolved_spectrum_pre_eclipse)
+CC_pre = Cross_Correlator(
+    wavelength_grid, fitted_flux, vsys * 1000, convolved_spectrum_pre_eclipse
+)
 
-K = np.linspace(0, 2 * Kp, 1000)
+K = np.linspace(0, 2 * Kp, 1001)
 
 K_vsys_map_pre_eclipse, CC_shifted = Kp_vsys_Plotter(
     K, vsys, orbital_phase_pre_eclipse, CC_pre
@@ -238,9 +232,17 @@ ax[2].set_ylabel("Cross Correlation Sum")
 K_vsys_map_pre_eclipse, _ = Kp_vsys_Plotter(K, vsys, orbital_phase_pre_eclipse, CC_pre)
 
 convolved_spectrum_post_eclipse = Time_Dependent_Spectrum(
-    wl, flux, orbital_phase_post_eclipse, Kp, time_dependent_broadening_kernels_post_eclipse)
+    wl,
+    flux,
+    orbital_phase_post_eclipse,
+    Kp,
+    time_dependent_broadening_kernels_post_eclipse,
+    wavelength_grid,
+)
 
-CC_post = Cross_Correlator(wl, flux, vsys * 1000, convolved_spectrum_post_eclipse)
+CC_post = Cross_Correlator(
+    wavelength_grid, fitted_flux, vsys * 1000, convolved_spectrum_post_eclipse
+)
 
 K_vsys_map_post_eclipse, _ = Kp_vsys_Plotter(
     K, vsys, orbital_phase_post_eclipse, CC_post
@@ -255,15 +257,22 @@ Kp_from_plot = K[max_lines[0][0]]
 Kp_from_plot_pre = K[max_lines_pre[0][0]]
 Kp_from_plot_post = K[max_lines_post[0][0]]
 
-fig, ax = plt.subplots(2)
+fig, ax = plt.subplots(3, sharex="all", sharey="all")
 ax[0].pcolormesh(vsys, K, combined_Kp_plot)
 # ax[0].imshow(combined_Kp_plot, aspect="auto")
 fig.supylabel(r"$K_p$")
 fig.supxlabel(r"$v_{\text{sys}}$")
-ax[0].axhline(Kp, ls="--", color="red", lw=0.5)
+ax[0].axhline(Kp, ls="--", color="red", lw=0.5, label=r"Actual $K_p$ = " + f"{Kp:.2f}")
 ax[0].axvline(0, ls="--", color="red", lw=0.5)
-ax[0].axhline(Kp_from_plot, ls="--", color="orange", lw=0.5)
+ax[0].axhline(
+    Kp_from_plot,
+    ls="--",
+    color="orange",
+    lw=0.5,
+    label=r"Measured $K_p$ =" + f"{Kp_from_plot:.2f}",
+)
 ax[0].axvline(vsys[max_lines[1][0]], ls="--", color="orange", lw=0.5)
+ax[0].legend()
 
 unconvolved_spec_pre, _ = Kp_vsys_Map_from_Flux(
     wl, flux, orbital_phase_pre_eclipse, vsys, Kp
@@ -284,11 +293,42 @@ ax[1].axhline(
     ls="--",
     color="orange",
     lw=0.5,
+    label=r"Measured $K_p$ = "
+    + f"{
+        K[np.where(total_unconvolved_spec == np.max(total_unconvolved_spec))[0][0]]:.2f}",
 )
+ax[1].legend()
 
 
 def gaussian(x, sigma):
     return np.exp(-0.5 * (x / sigma) ** 2)
 
+
+g = gaussian(x, 2)
+
+gaussian_spec_pre, _ = Kp_vsys_Map_from_Flux(
+    wl, flux, orbital_phase_pre_eclipse, vsys, Kp, g
+)
+
+gaussian_spec_post, _ = Kp_vsys_Map_from_Flux(
+    wl, flux, orbital_phase_post_eclipse, vsys, Kp, g
+)
+
+total_gaussian_spec = gaussian_spec_pre + gaussian_spec_post
+
+ax[2].pcolormesh(vsys, K, total_gaussian_spec)
+# ax[2].imshow(combined_Kp_plot, aspect="auto")
+ax[2].axhline(Kp, ls="--", color="red", lw=0.5)
+ax[2].axvline(0, ls="--", color="red", lw=0.5)
+ax[2].axhline(
+    K[np.where(total_gaussian_spec == np.max(total_gaussian_spec))[0][0]],
+    ls="--",
+    color="orange",
+    lw=0.5,
+    label=r"Measured $K_p$ = "
+    + f"{
+        K[np.where(total_gaussian_spec == np.max(total_gaussian_spec))[0][0]]:.2f}",
+)
+ax[2].legend()
 
 plt.show()

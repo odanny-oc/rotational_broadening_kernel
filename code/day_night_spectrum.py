@@ -14,6 +14,7 @@ import scipy.signal as scisig
 from petitRADTRANS.spectral_model import SpectralModel
 from petitRADTRANS.math import resolving_space
 from petitRADTRANS.planet import Planet
+from functools import lru_cache
 import time
 
 home_path = os.environ["HOME"]
@@ -44,7 +45,6 @@ tfull = (
 )  # Tfull
 eclipse_end = 0.5 - tfull / period
 veq = 2 * np.pi * Rpl / period  # km/s
-
 
 def Broadening_Kernel_OP(x, op):
     if not isinstance(op, np.ndarray):
@@ -187,8 +187,8 @@ total_convolved_spectrum_pre = (
     convolved_spectrum_pre_eclipse_night + convolved_spectrum_pre_eclipse_day
 )
 
-vsys = np.linspace(-200, 200, 1000)
-K = np.linspace(0, 2 * Kp, 1000)
+vsys = np.linspace(-200, 200, 1001)
+K = np.linspace(0, 2 * Kp, 1001)
 flux_model = scisig.fftconvolve(flux_day + flux_night, ref_kernel, "same")
 
 CC_pre = Cross_Correlator(wl, flux_model, vsys * 1000, total_convolved_spectrum_pre)
@@ -260,24 +260,25 @@ max_unconv = np.where(total_unconvolve_spec == np.max(total_unconvolve_spec))
 
 fig, ax = plt.subplots(3, sharex="all", sharey="all")
 fig.suptitle(r"$K_p$ - $v_{\text{sys}}$ Plots for Different Kernels")
-ax[0].set_title("No Kernel")
-ax[1].set_title("Day-Night Kernel")
+ax[1].set_title("No Kernel")
+ax[0].set_title("Day-Night Kernel")
 ax[2].set_title("Gaussian Kernel")
 fig.supxlabel(r"$v_{\text{sys}}$ (km/s)")
 fig.supylabel(r"$K_p$ (km/s)")
-ax[0].pcolormesh(vsys, K_array, total_unconvolve_spec)
+
+ax[0].pcolormesh(vsys, K, combined_Kp_plot)
 ax[0].axhline(
     Kp, ls="--", color="red", lw=0.5, label=r"Actual $K_p$ = " + f"{Kp:.2f}km/s"
 )
 ax[0].axvline(0, ls="--", color="red", lw=0.5)
 ax[0].axhline(
-    K_array[max_unconv[0][0]],
+    Kp_from_plot,
     ls="--",
     color="blue",
     lw=0.5,
-    label=r"Measured $K_p$ = " + f"{K_array[max_unconv[0][0]]:.2f}km/s",
+    label=r"Measured $K_p$ = " + f"{Kp_from_plot:.2f}km/s",
 )
-ax[0].axvline(vsys[max_unconv[1][0]], ls="--", color="blue", lw=0.5)
+ax[0].axvline(vsys[max_lines[1][0]], ls="--", color="blue", lw=0.5)
 ax[0].legend(
     edgecolor="k",
     facecolor="w",
@@ -285,34 +286,6 @@ ax[0].legend(
     fancybox=True,
 )
 ax[0].annotate(
-    r"$\Delta K_p$ = " + f"{( Kp - K_array[max_unconv[0][0]] ):.2f}km/s",
-    xy=(0.9, 0.85),
-    xycoords="axes fraction",
-    size=10,
-    bbox=dict(fc="w", ec="k", boxstyle="round", linewidth=2),
-)
-
-
-ax[1].pcolormesh(vsys, K, combined_Kp_plot)
-ax[1].axhline(
-    Kp, ls="--", color="red", lw=0.5, label=r"Actual $K_p$ = " + f"{Kp:.2f}km/s"
-)
-ax[1].axvline(0, ls="--", color="red", lw=0.5)
-ax[1].axhline(
-    Kp_from_plot,
-    ls="--",
-    color="blue",
-    lw=0.5,
-    label=r"Measured $K_p$ = " + f"{Kp_from_plot:.2f}km/s",
-)
-ax[1].axvline(vsys[max_lines[1][0]], ls="--", color="blue", lw=0.5)
-ax[1].legend(
-    edgecolor="k",
-    facecolor="w",
-    framealpha=1,
-    fancybox=True,
-)
-ax[1].annotate(
     r"$\Delta K_p$ = " + f"{( Kp -  Kp_from_plot):.2f}km/s",
     xy=(0.9, 0.85),
     xycoords="axes fraction",
@@ -320,6 +293,32 @@ ax[1].annotate(
     bbox=dict(fc="w", ec="k", boxstyle="round", linewidth=2),
 )
 
+ax[1].pcolormesh(vsys, K_array, total_unconvolve_spec)
+ax[1].axhline(
+   Kp, ls="--", color="red", lw=0.5, label=r"Actual $K_p$ = " + f"{Kp:.2f}km/s"
+)
+ax[1].axvline(0, ls="--", color="red", lw=0.5)
+ax[1].axhline(
+   K_array[max_unconv[0][0]],
+   ls="--",
+   color="blue",
+   lw=0.5,
+   label=r"Measured $K_p$ = " + f"{K_array[max_unconv[0][0]]:.2f}km/s",
+)
+ax[1].axvline(vsys[max_unconv[1][0]], ls="--", color="blue", lw=0.5)
+ax[1].legend(
+    edgecolor="k",
+    facecolor="w",
+    framealpha=1,
+    fancybox=True,
+)
+ax[1].annotate(
+    r"$\Delta K_p$ = " + f"{( Kp - K_array[max_unconv[0][0]] ):.2f}km/s",
+    xy=(0.9, 0.85),
+    xycoords="axes fraction",
+    size=10,
+    bbox=dict(fc="w", ec="k", boxstyle="round", linewidth=2),
+)
 
 def gaussian(x, sigma):
     return np.exp(-0.5 * (x / sigma) ** 2)
