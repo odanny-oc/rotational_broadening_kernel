@@ -15,6 +15,11 @@ home_path = os.environ["HOME"]
 local_path = home_path + "/exoplanet_atmospheres/code"
 
 resolution = 400000
+wasp121_post_data = np.load(
+    local_path + "/crires_posteclipse_WASP121_2021-12-15_processed.npz"
+)
+wavelength_grid = wasp121_post_data["W"][8] * 1e-4  # resolution ~ 300000
+
 
 
 def black_body(wl, T):

@@ -2,13 +2,14 @@ import numpy as np
 import astropy.constants as const
 import scipy.signal as scisig
 
+
 def Time_Dependent_Spectrum(wl, flux, op, kp, kernel=None, wl_grid=None):
     vp = kp * np.sin(2 * np.pi * op)
 
     if not isinstance(wl_grid, np.ndarray):
         Wavelengths = np.outer(1 - vp * 1000 / const.c.value, wl)
     else:
-        Wavelengths  = np.outer(1 - vp * 1000 / const.c.value, wl_grid)
+        Wavelengths = np.outer(1 - vp * 1000 / const.c.value, wl_grid)
 
     spectrum = np.interp(Wavelengths, wl, flux)
     if not isinstance(kernel, np.ndarray):
@@ -20,7 +21,7 @@ def Time_Dependent_Spectrum(wl, flux, op, kp, kernel=None, wl_grid=None):
             convolved_spectrum[i] = scisig.fftconvolve(spectrum[i], ker, "same")
     else:
         convolved_spectrum = np.array(
-            [scisig.fftconvolve(i, kernel, 'same') for i in spectrum]
+            [scisig.fftconvolve(i, kernel, "same") for i in spectrum]
         )
     return convolved_spectrum
 
@@ -45,14 +46,15 @@ def Kp_vsys_Plotter(K, vsys, op, CC):
     return K_vsys_map, CC_shifted
 
 
-def Kp_vsys_Map_from_Flux(wl, flux, op, vsys, kp, ker=None, K=None, wl_grid=None, flux_grid =None):
+def Kp_vsys_Map_from_Flux(
+    wl, flux, op, vsys, kp, ker=None, K=None, wl_grid=None, flux_grid=None
+):
     if not isinstance(K, np.ndarray):
         K = np.linspace(0, 2 * kp, 1001)
-    convolved_spectrum = Time_Dependent_Spectrum(wl, flux, op, kp, ker,wl_grid)
+    convolved_spectrum = Time_Dependent_Spectrum(wl, flux, op, kp, ker, wl_grid)
     if not isinstance(flux_grid, np.ndarray):
         CC = Cross_Correlator(wl, flux, vsys * 1000, convolved_spectrum)
     else:
         CC = Cross_Correlator(wl_grid, flux_grid, vsys * 1000, convolved_spectrum)
     Kp_vsys_plot, _ = Kp_vsys_Plotter(K, vsys, op, CC)
     return Kp_vsys_plot, K
-
