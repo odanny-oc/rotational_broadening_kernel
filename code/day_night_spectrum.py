@@ -6,7 +6,6 @@ from functions import Cross_Correlator
 from functions import Kp_vsys_Plotter
 from functions import Kp_vsys_Map_from_Flux
 from astropy import constants as const
-from petitRADTRANS.plotlib import plot_radtrans_opacities
 from petitRADTRANS import physical_constants as cst, planet
 from petitRADTRANS.config import petitradtrans_config_parser
 from petitRADTRANS.physics import temperature_profile_function_guillot_global
@@ -24,6 +23,11 @@ local_path = home_path + "/exoplanet_atmospheres/code"
 day_night_atmosphere = np.load(
     os.path.join(local_path, "day_night_atmosphere.npz")
 )  # relative flux (normalised) and wavelength in microns
+
+wasp121_post_data = np.load(
+    local_path + "/crires_posteclipse_WASP121_2021-12-15_processed.npz"
+)
+wavelength_grid = wasp121_post_data["W"][8] * 1e-4  # resolution ~ 300000
 
 
 # Planet and Star Parameters
@@ -45,6 +49,7 @@ tfull = (
 )  # Tfull
 eclipse_end = 0.5 - tfull / period
 veq = 2 * np.pi * Rpl / period  # km/s
+
 
 def Broadening_Kernel_OP(x, op):
     if not isinstance(op, np.ndarray):
@@ -121,12 +126,12 @@ def Broadening_Kernel_OP(x, op):
         return kernel_array, full_kernel
 
 
-resolution = 200000
+resolution = 400000
 dv = const.c.value * 1e-3 / resolution
 points_number = 51
 n_exposure = 300
 kernel_res = n_exposure // 2
-range_vel = 0.2
+range_vel = 2
 
 orbital_phase_pre_eclipse = np.linspace(0.334, 0.425, n_exposure)  # time/period
 orbital_phase_post_eclipse = np.linspace(0.539, 0.626, n_exposure)  # time/period
@@ -172,15 +177,25 @@ flux_night = day_night_atmosphere["flux_night"]
 flux_day -= np.mean(flux_day)
 flux_night -= np.mean(flux_night)
 
+flux_grid_day = np.interp(wavelength_grid, wl, flux_day)
+flux_grid_night = np.interp(wavelength_grid, wl, flux_night)
+
 convolved_spectrum_pre_eclipse_day = Time_Dependent_Spectrum(
     wl,
     flux_day,
     orbital_phase_pre_eclipse,
     Kp,
     time_dependent_broadening_kernels_pre_eclipse,
+    wl_grid=wavelength_grid,
 )
+
 convolved_spectrum_pre_eclipse_night = Time_Dependent_Spectrum(
-    wl, flux_night, orbital_phase_pre_eclipse, Kp, anti_kernels_pre_eclipse
+    wl,
+    flux_night,
+    orbital_phase_pre_eclipse,
+    Kp,
+    anti_kernels_pre_eclipse,
+    wl_grid=wavelength_grid,
 )
 
 total_convolved_spectrum_pre = (
@@ -189,9 +204,13 @@ total_convolved_spectrum_pre = (
 
 vsys = np.linspace(-200, 200, 1001)
 K = np.linspace(0, 2 * Kp, 1001)
+flux_grid_tot = flux_grid_day + flux_grid_night
 flux_model = scisig.fftconvolve(flux_day + flux_night, ref_kernel, "same")
+flux_model_grid = scisig.fftconvolve(flux_grid_tot, ref_kernel, "same")
 
-CC_pre = Cross_Correlator(wl, flux_model, vsys * 1000, total_convolved_spectrum_pre)
+CC_pre = Cross_Correlator(
+    wavelength_grid, flux_model_grid, vsys * 1000, total_convolved_spectrum_pre
+)
 
 start_time = time.time()
 K_vsys_map_pre_eclipse, CC_shifted = Kp_vsys_Plotter(
@@ -214,23 +233,32 @@ ax[2].set_xlabel("System Velocity (km/s)")
 ax[2].set_ylabel("Cross Correlation Sum")
 
 print("time -- %s seconds" % (time.time() - start_time))
+
 convolved_spectrum_post_eclipse_day = Time_Dependent_Spectrum(
     wl,
     flux_day,
     orbital_phase_post_eclipse,
     Kp,
     time_dependent_broadening_kernels_post_eclipse,
+    wl_grid=wavelength_grid,
 )
 
 convolved_spectrum_post_eclipse_night = Time_Dependent_Spectrum(
-    wl, flux_night, orbital_phase_post_eclipse, Kp, anti_kernels_post_eclipse
+    wl,
+    flux_night,
+    orbital_phase_post_eclipse,
+    Kp,
+    anti_kernels_post_eclipse,
+    wl_grid=wavelength_grid,
 )
 
 total_convolved_spectrum_post = (
     convolved_spectrum_post_eclipse_day + convolved_spectrum_post_eclipse_night
 )
 
-CC_post = Cross_Correlator(wl, flux_model, vsys * 1000, total_convolved_spectrum_post)
+CC_post = Cross_Correlator(
+    wavelength_grid, flux_model_grid, vsys * 1000, total_convolved_spectrum_post
+)
 
 K_vsys_map_post_eclipse, _ = Kp_vsys_Plotter(
     K, vsys, orbital_phase_post_eclipse, CC_post
@@ -247,11 +275,23 @@ Kp_from_plot_pre = K[max_lines_pre[0][0]]
 Kp_from_plot_post = K[max_lines_post[0][0]]
 
 unconvolved_Kp_pre, K_array = Kp_vsys_Map_from_Flux(
-    wl, flux_day + flux_night, orbital_phase_pre_eclipse, vsys, Kp
+    wl,
+    flux_day + flux_night,
+    orbital_phase_pre_eclipse,
+    vsys,
+    Kp,
+    wl_grid=wavelength_grid,
+    flux_grid=flux_model_grid,
 )
 
 unconvolved_Kp_post, K_array = Kp_vsys_Map_from_Flux(
-    wl, flux_day + flux_night, orbital_phase_post_eclipse, vsys, Kp
+    wl,
+    flux_day + flux_night,
+    orbital_phase_post_eclipse,
+    vsys,
+    Kp,
+    wl_grid=wavelength_grid,
+    flux_grid=flux_model_grid,
 )
 
 total_unconvolve_spec = unconvolved_Kp_pre + unconvolved_Kp_post
@@ -295,15 +335,15 @@ ax[0].annotate(
 
 ax[1].pcolormesh(vsys, K_array, total_unconvolve_spec)
 ax[1].axhline(
-   Kp, ls="--", color="red", lw=0.5, label=r"Actual $K_p$ = " + f"{Kp:.2f}km/s"
+    Kp, ls="--", color="red", lw=0.5, label=r"Actual $K_p$ = " + f"{Kp:.2f}km/s"
 )
 ax[1].axvline(0, ls="--", color="red", lw=0.5)
 ax[1].axhline(
-   K_array[max_unconv[0][0]],
-   ls="--",
-   color="blue",
-   lw=0.5,
-   label=r"Measured $K_p$ = " + f"{K_array[max_unconv[0][0]]:.2f}km/s",
+    K_array[max_unconv[0][0]],
+    ls="--",
+    color="blue",
+    lw=0.5,
+    label=r"Measured $K_p$ = " + f"{K_array[max_unconv[0][0]]:.2f}km/s",
 )
 ax[1].axvline(vsys[max_unconv[1][0]], ls="--", color="blue", lw=0.5)
 ax[1].legend(
@@ -320,22 +360,33 @@ ax[1].annotate(
     bbox=dict(fc="w", ec="k", boxstyle="round", linewidth=2),
 )
 
+
 def gaussian(x, sigma):
     return np.exp(-0.5 * (x / sigma) ** 2)
 
 
-print(wl.shape)
-print(flux_day.shape)
-print((flux_day + flux_night).shape)
-
 g = gaussian(x, 2)
 
 gaussian_convolved_pre, _ = Kp_vsys_Map_from_Flux(
-    wl, flux_day + flux_night, orbital_phase_pre_eclipse, vsys, Kp, g
+    wl,
+    flux_day + flux_night,
+    orbital_phase_pre_eclipse,
+    vsys,
+    Kp,
+    g,
+    wl_grid=wavelength_grid,
+    flux_grid=flux_model_grid,
 )
 
 gaussian_convolved_post, _ = Kp_vsys_Map_from_Flux(
-    wl, flux_day + flux_night, orbital_phase_post_eclipse, vsys, Kp, g
+    wl,
+    flux_day + flux_night,
+    orbital_phase_post_eclipse,
+    vsys,
+    Kp,
+    g,
+    wl_grid=wavelength_grid,
+    flux_grid=flux_model_grid,
 )
 
 gaussian_convolved_tot = gaussian_convolved_pre + gaussian_convolved_post

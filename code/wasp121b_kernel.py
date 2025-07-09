@@ -127,7 +127,7 @@ dv = const.c.value * 1e-3 / resolution
 points_number = 51
 n_exposure = 300
 kernel_res = n_exposure // 2
-range_vel = 1.0
+range_vel = 1
 
 orbital_phase_pre_eclipse = np.linspace(0.334, 0.425, n_exposure)  # time/period
 orbital_phase_post_eclipse = np.linspace(0.539, 0.626, n_exposure)  # time/period
@@ -258,6 +258,10 @@ Kp_from_plot_pre = K[max_lines_pre[0][0]]
 Kp_from_plot_post = K[max_lines_post[0][0]]
 
 fig, ax = plt.subplots(3, sharex="all", sharey="all")
+fig.suptitle(r"$K_p$ - $v_{\text{sys}}$ Plots for Different Simulations")
+ax[0].set_title(r"$V_{\text{eq}}$ Kernel")
+ax[1].set_title(r"No Kernel")
+ax[2].set_title(r"Gaussian Kernel")
 ax[0].pcolormesh(vsys, K, combined_Kp_plot)
 # ax[0].imshow(combined_Kp_plot, aspect="auto")
 fig.supylabel(r"$K_p$")
@@ -275,11 +279,27 @@ ax[0].axvline(vsys[max_lines[1][0]], ls="--", color="orange", lw=0.5)
 ax[0].legend()
 
 unconvolved_spec_pre, _ = Kp_vsys_Map_from_Flux(
-    wl, flux, orbital_phase_pre_eclipse, vsys, Kp
+    wl,
+    flux,
+    orbital_phase_pre_eclipse,
+    vsys,
+    Kp,
+    None,
+    None,
+    wavelength_grid,
+    fitted_flux,
 )
 
 unconvolved_spec_post, _ = Kp_vsys_Map_from_Flux(
-    wl, flux, orbital_phase_post_eclipse, vsys, Kp
+    wl,
+    flux,
+    orbital_phase_post_eclipse,
+    vsys,
+    Kp,
+    None,
+    None,
+    wavelength_grid,
+    fitted_flux,
 )
 
 total_unconvolved_spec = unconvolved_spec_pre + unconvolved_spec_post
@@ -307,11 +327,19 @@ def gaussian(x, sigma):
 g = gaussian(x, 2)
 
 gaussian_spec_pre, _ = Kp_vsys_Map_from_Flux(
-    wl, flux, orbital_phase_pre_eclipse, vsys, Kp, g
+    wl, flux, orbital_phase_pre_eclipse, vsys, Kp, g, None, wavelength_grid, fitted_flux
 )
 
 gaussian_spec_post, _ = Kp_vsys_Map_from_Flux(
-    wl, flux, orbital_phase_post_eclipse, vsys, Kp, g
+    wl,
+    flux,
+    orbital_phase_post_eclipse,
+    vsys,
+    Kp,
+    g,
+    None,
+    wavelength_grid,
+    fitted_flux,
 )
 
 total_gaussian_spec = gaussian_spec_pre + gaussian_spec_post
@@ -329,6 +357,86 @@ ax[2].axhline(
     + f"{
         K[np.where(total_gaussian_spec == np.max(total_gaussian_spec))[0][0]]:.2f}",
 )
+ax[2].legend()
+
+vsys = np.linspace(-300, 300, 1001)
+op_pre = np.linspace(0.2, 0.25, n_exposure)
+op_post = np.linspace(0.7, 0.75, n_exposure)
+
+quart_Kp_vsys_pre, K = Kp_vsys_Map_from_Flux(
+    wl,
+    flux,
+    op_pre,
+    vsys,
+    Kp,
+    broadening_kernel_orbital_phase(x, op_pre)[0],
+    None,
+    wavelength_grid,
+    fitted_flux,
+)
+quart_Kp_vsys_post, _ = Kp_vsys_Map_from_Flux(
+    wl,
+    flux,
+    op_post,
+    vsys,
+    Kp,
+    broadening_kernel_orbital_phase(x, op_post)[0],
+    wl_grid = wavelength_grid,
+    flux_grid = fitted_flux,
+)
+
+
+quart_spec_pre = Time_Dependent_Spectrum(
+    wl, flux, op_pre, Kp, broadening_kernel_orbital_phase(x, op_pre)[0], wavelength_grid
+)
+
+CC_quart = Cross_Correlator(wavelength_grid, fitted_flux, vsys * 1000, quart_spec_pre)
+
+Kp_vsys_quart, _ = Kp_vsys_Plotter(K, vsys, op_pre, CC_quart)
+
+quart_Kp_vsys_tot = quart_Kp_vsys_post + quart_Kp_vsys_pre
+
+fig, ax = plt.subplots(2)
+ax[0].pcolormesh(vsys, op_pre, CC_quart)
+ax[1].pcolormesh(vsys, K, Kp_vsys_quart)
+
+
+fig, ax = plt.subplots(3, sharex="all", sharey="all")
+ax[0].pcolormesh(vsys, K, quart_Kp_vsys_tot)
+ax[1].pcolormesh(vsys, K, quart_Kp_vsys_pre)
+ax[2].pcolormesh(vsys, K, quart_Kp_vsys_post)
+# ax[0].imshow(combined_Kp_plot, aspect="auto")
+ax[0].axhline(Kp, ls="--", color="red", lw=0.5)
+ax[0].axvline(0, ls="--", color="red", lw=0.5)
+ax[0].axhline(
+    K[np.where(quart_Kp_vsys_tot == np.max(quart_Kp_vsys_tot))[0][0]],
+    ls="--",
+    color="orange",
+    lw=0.5,
+    label=r"Measured $K_p$ = "
+    + f"{
+        K[np.where(quart_Kp_vsys_tot == np.max(quart_Kp_vsys_tot))[0][0]]:.2f}",
+)
+ax[1].axhline(
+    K[np.where(quart_Kp_vsys_pre == np.max(quart_Kp_vsys_pre))[0][0]],
+    ls="--",
+    color="orange",
+    lw=0.5,
+    label=r"Measured $K_p$ = "
+    + f"{
+        K[np.where(quart_Kp_vsys_pre == np.max(quart_Kp_vsys_pre))[0][0]]:.2f}",
+)
+ax[2].axhline(
+    K[np.where(quart_Kp_vsys_post == np.max(quart_Kp_vsys_post))[0][0]],
+    ls="--",
+    color="orange",
+    lw=0.5,
+    label=r"Measured $K_p$ = "
+    + f"{
+        K[np.where(quart_Kp_vsys_post == np.max(quart_Kp_vsys_post))[0][0]]:.2f}",
+)
+ax[0].legend()
+ax[1].legend()
 ax[2].legend()
 
 plt.show()

@@ -14,7 +14,7 @@ from petitRADTRANS.config import petitradtrans_config_parser
 home_path = os.environ["HOME"]
 local_path = home_path + "/exoplanet_atmospheres/code"
 
-resolution = 200000
+resolution = 400000
 
 
 def black_body(wl, T):
@@ -44,7 +44,7 @@ ttot = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 + Rpl / Rs) ** 2 - b**2))
 tfull = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 - Rpl / Rs) ** 2 - b**2))
 
 data_wavelengths = (
-    resolving_space(2.3, 2.4, resolution) * 1e-4
+    resolving_space(2.1, 2.2, resolution) * 1e-4
 )  # (cm) generate wavelengths at a constant resolving power
 
 spectral_model_night = SpectralModel(
