@@ -18,8 +18,9 @@ resolution = 400000
 wasp121_post_data = np.load(
     local_path + "/crires_posteclipse_WASP121_2021-12-15_processed.npz"
 )
-wavelength_grid = wasp121_post_data["W"][8] * 1e-4  # resolution ~ 300000
+wavelength_grid = wasp121_post_data["W"][-1] * 1e-4  # resolution ~ 300000
 
+print(wavelength_grid)
 
 
 def black_body(wl, T):
@@ -49,7 +50,7 @@ ttot = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 + Rpl / Rs) ** 2 - b**2))
 tfull = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 - Rpl / Rs) ** 2 - b**2))
 
 data_wavelengths = (
-    resolving_space(2.1, 2.2, resolution) * 1e-4
+    resolving_space(2.4, 2.5, resolution) * 1e-4
 )  # (cm) generate wavelengths at a constant resolving power
 
 spectral_model_night = SpectralModel(

@@ -1,6 +1,14 @@
 import numpy as np
 import astropy.constants as const
 import scipy.signal as scisig
+import time
+
+def timer(func):
+    def wrapper():
+        start_time = time.time()
+        func()
+        print(f"{func.__name__} -- %s seconds" % (time.time() - start_time))
+    return wrapper
 
 
 def Time_Dependent_Spectrum(wl, flux, op, kp, kernel=None, wl_grid=None):
@@ -25,7 +33,7 @@ def Time_Dependent_Spectrum(wl, flux, op, kp, kernel=None, wl_grid=None):
         )
     return convolved_spectrum
 
-
+# @timer
 def Cross_Correlator(wl, flux, vsys, spectrum):
     wl_doppler = np.outer(1 - vsys / const.c.value, wl)
     model = np.interp(wl_doppler, wl, flux)

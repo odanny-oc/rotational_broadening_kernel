@@ -27,7 +27,7 @@ day_night_atmosphere = np.load(
 wasp121_post_data = np.load(
     local_path + "/crires_posteclipse_WASP121_2021-12-15_processed.npz"
 )
-wavelength_grid = wasp121_post_data["W"][8] * 1e-4  # resolution ~ 300000
+wavelength_grid = wasp121_post_data["W"][-1] * 1e-4  # resolution ~ 300000
 
 
 # Planet and Star Parameters
@@ -212,7 +212,6 @@ CC_pre = Cross_Correlator(
     wavelength_grid, flux_model_grid, vsys * 1000, total_convolved_spectrum_pre
 )
 
-start_time = time.time()
 K_vsys_map_pre_eclipse, CC_shifted = Kp_vsys_Plotter(
     K, vsys, orbital_phase_pre_eclipse, CC_pre
 )
@@ -231,8 +230,6 @@ ax[1].set_ylabel("Orbital Phase")
 ax[2].plot(vsys, cc_sum)
 ax[2].set_xlabel("System Velocity (km/s)")
 ax[2].set_ylabel("Cross Correlation Sum")
-
-print("time -- %s seconds" % (time.time() - start_time))
 
 convolved_spectrum_post_eclipse_day = Time_Dependent_Spectrum(
     wl,
@@ -425,4 +422,138 @@ ax[2].annotate(
     bbox=dict(fc="w", ec="k", boxstyle="round", linewidth=2),
 )
 
+flux_model_day = scisig.fftconvolve(flux_grid_day, ref_kernel, "same")
+flux_model_night = scisig.fftconvolve(flux_grid_night, ref_kernel, "same")
+
+CC_day_pre = Cross_Correlator(
+    wl=wavelength_grid,
+    flux=flux_grid_day,
+    spectrum=total_convolved_spectrum_pre,
+    vsys=vsys * 1000,
+)
+
+CC_night_pre = Cross_Correlator(
+    wl=wavelength_grid,
+    flux=flux_grid_night,
+    spectrum=total_convolved_spectrum_pre,
+    vsys=vsys * 1000,
+)
+
+CC_day_post = Cross_Correlator(
+    wl=wavelength_grid,
+    flux=flux_grid_day,
+    spectrum=total_convolved_spectrum_post,
+    vsys=vsys * 1000,
+)
+
+CC_night_post = Cross_Correlator(
+    wl=wavelength_grid,
+    flux=flux_grid_night,
+    spectrum=total_convolved_spectrum_post,
+    vsys=vsys * 1000,
+)
+
+Kp_vsys_day_pre, _ = Kp_vsys_Plotter(
+    K=K, vsys=vsys, CC=CC_day_pre, op=orbital_phase_pre_eclipse
+)
+
+Kp_vsys_day_post, _ = Kp_vsys_Plotter(
+    K=K, vsys=vsys, CC=CC_day_post, op=orbital_phase_post_eclipse
+)
+
+Kp_vsys_night_pre, _ = Kp_vsys_Plotter(
+    K=K, vsys=vsys, CC=CC_night_pre, op=orbital_phase_pre_eclipse
+)
+
+Kp_vsys_night_post, _ = Kp_vsys_Plotter(
+    K=K, vsys=vsys, CC=CC_night_post, op=orbital_phase_post_eclipse
+)
+# fig, ax = plt.subplots(2)
+# ax[0].set_title("Flux Night")
+# ax[0].plot(wavelength_grid, flux_grid_night)
+# ax[1].set_title("Flux Day")
+# ax[1].plot(wavelength_grid, flux_grid_day)
+
+fig, ax = plt.subplots(2)
+fig.suptitle("Pre-Eclipse")
+ax[0].pcolormesh(vsys, orbital_phase_pre_eclipse, CC_day_pre)
+ax[1].pcolormesh(vsys, orbital_phase_pre_eclipse, CC_night_pre)
+ax[0].set_title("Cross Correlation Day Side")
+ax[1].set_title("Cross Correlation Night Side")
+fig.supxlabel(r"$v_{\text{sys}}$")
+fig.supylabel(r"Orbital Phase")
+
+fig, ax = plt.subplots(2)
+fig.suptitle("Post-Eclipse")
+ax[0].pcolormesh(vsys, orbital_phase_post_eclipse, CC_day_post)
+ax[1].pcolormesh(vsys, orbital_phase_post_eclipse, CC_night_post)
+ax[0].set_title("Cross Correlation Day Side")
+ax[1].set_title("Cross Correlation Night Side")
+fig.supxlabel(r"$v_{\text{sys}}$")
+fig.supylabel(r"Orbital Phase")
+
+Kp_vsys_day = Kp_vsys_day_pre + Kp_vsys_day_post
+Kp_vsys_night = Kp_vsys_night_pre + Kp_vsys_night_post
+
+fig, ax = plt.subplots(2, sharex="all", sharey="all")
+fig.suptitle(r"$K_p$ - $v_{\text{sys}}$ Night")
+fig.supxlabel(r"$v_{\text{sys}}$")
+fig.supylabel(r"$K_p$")
+ax[0].pcolormesh(vsys, K, Kp_vsys_day)
+ax[0].axhline(
+    Kp, ls="--", color="blue", lw=0.5, label=r"Actual $K_p$ = " + f"{Kp:.2f}km/s"
+)
+ax[0].axvline(
+    0, ls="--", color="blue", lw=0.5, label=r"Actual $v_{\text{sys}}$ = " + "0"
+)
+ax[0].axhline(
+    K[np.where(Kp_vsys_day == np.max(Kp_vsys_day))[0][0]],
+    ls="--",
+    color="blue",
+    lw=0.5,
+    label=r"Measured $K_p$ = "
+    + f"{K[np.where(Kp_vsys_day == np.max(Kp_vsys_day))[0][0]]:.2f}km/s",
+)
+ax[0].axvline(
+    vsys[np.where(Kp_vsys_day == np.max(Kp_vsys_day))[1][0]],
+    ls="--",
+    color="blue",
+    lw=0.5,
+    label=r"Measured $v_{\text{sys}}$ = "
+    + f"{vsys[np.where(Kp_vsys_day == np.max(Kp_vsys_day))[1][0]]:.2f}km/s",
+)
+ax[0].set_title("Day")
+ax[1].set_title("Night")
+ax[1].pcolormesh(vsys, K, Kp_vsys_night)
+
+ax[1].axhline(
+    Kp,
+    ls="--",
+    color="blue",
+    lw=0.5,
+)
+ax[1].axvline(
+    0,
+    ls="--",
+    color="blue",
+    lw=0.5,
+)
+ax[1].axhline(
+    K[np.where(Kp_vsys_night == np.max(Kp_vsys_night))[0][0]],
+    ls="--",
+    color="blue",
+    lw=0.5,
+    label=r"Measured $K_p$ = "
+    + f"{K[np.where(Kp_vsys_night == np.max(Kp_vsys_night))[0][0]]:.2f}km/s",
+)
+ax[1].axvline(
+    vsys[np.where(Kp_vsys_night == np.max(Kp_vsys_night))[1][0]],
+    ls="--",
+    color="blue",
+    lw=0.5,
+    label=r"Measured $v_{\text{sys}}$ = "
+    + f"{vsys[np.where(Kp_vsys_night == np.max(Kp_vsys_night))[1][0]]:.2f}km/s",
+)
+ax[0].legend()
+ax[1].legend()
 plt.show()
