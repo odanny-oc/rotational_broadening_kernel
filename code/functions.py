@@ -66,3 +66,7 @@ def Kp_vsys_Map_from_Flux(
         CC = Cross_Correlator(wl_grid, flux_grid, vsys * 1000, convolved_spectrum)
     Kp_vsys_plot, _ = Kp_vsys_Plotter(K, vsys, op, CC)
     return Kp_vsys_plot, K
+
+def maxIndex(a):
+    index = np.where(a == np.max(a))
+    return np.array([index[0][0], index[1][0]])

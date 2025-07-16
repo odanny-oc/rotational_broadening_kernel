@@ -12,6 +12,27 @@ Papers:
 swaetha paper
 
 to do:
+
+send code
+
+different models (Fe)
+
+mess with veq 100km/s
+
+plot over CC with Kp(measured) * sin(phi)
+
+CC CO and H2O templates
+
+Check kernel range
+
+larger wavelength range
+
+CC with unbroadened spectrum
+
+check delta function kernel
+
+
+
 WASP121-b thermal inversions
 model for day and night side (h2o and co)
 

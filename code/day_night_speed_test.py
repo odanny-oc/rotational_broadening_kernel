@@ -232,7 +232,7 @@ print("Kplotter --- %s seconds ---" % (time.time() - start_time))
 
 
 start_time = time.time()
-K_vsys_map_pre_eclipse = Kplotter(K, vsys, orbital_phase_pre_eclipse, CC)
+K_vsys_map_pre_eclipse, _ = Kplotter(K, vsys, orbital_phase_pre_eclipse, CC)
 print("Kplotter import --- %s seconds ---" % (time.time() - start_time))
 
 vp_post_eclipse = Kp * np.sin(orbital_phase_post_eclipse * 2 * np.pi)

@@ -127,7 +127,7 @@ dv = const.c.value * 1e-3 / resolution
 points_number = 51
 n_exposure = 300
 kernel_res = n_exposure // 2
-range_vel = 1
+range_vel = 2
 
 orbital_phase_pre_eclipse = np.linspace(0.334, 0.425, n_exposure)  # time/period
 orbital_phase_post_eclipse = np.linspace(0.539, 0.626, n_exposure)  # time/period
@@ -163,8 +163,8 @@ flux -= np.mean(flux)
 
 fitted_flux = np.interp(wavelength_grid, wl, flux)
 
-# fig, ax = plt.subplots(2)
-# ax[0].plot(wavelength_grid, fitted_flux)
+fig, ax = plt.subplots()
+ax.plot(x, broadening_kernel_orbital_phase(x, 0.25)[0])
 # ax[1].plot(wl, flux)
 
 vp_pre_eclipse = Kp * np.sin(orbital_phase_pre_eclipse * 2 * np.pi)
@@ -360,8 +360,8 @@ ax[2].axhline(
 ax[2].legend()
 
 vsys = np.linspace(-300, 300, 1001)
-op_pre = np.linspace(0.2, 0.25, n_exposure)
-op_post = np.linspace(0.7, 0.75, n_exposure)
+op_pre = np.linspace(0, 0.25, n_exposure)
+op_post = np.linspace(0.5, 0.75, n_exposure)
 
 quart_Kp_vsys_pre, K = Kp_vsys_Map_from_Flux(
     wl,
@@ -392,13 +392,13 @@ quart_spec_pre = Time_Dependent_Spectrum(
 
 CC_quart = Cross_Correlator(wavelength_grid, fitted_flux, vsys * 1000, quart_spec_pre)
 
-Kp_vsys_quart, _ = Kp_vsys_Plotter(K, vsys, op_pre, CC_quart)
+Kp_vsys_quart = Kp_vsys_Plotter(K, vsys, op_pre, CC_quart)
 
 quart_Kp_vsys_tot = quart_Kp_vsys_post + quart_Kp_vsys_pre
 
-fig, ax = plt.subplots(2)
-ax[0].pcolormesh(vsys, op_pre, CC_quart)
-ax[1].pcolormesh(vsys, K, Kp_vsys_quart)
+# fig, ax = plt.subplots(2)
+# ax[0].pcolormesh(vsys, op_pre, CC_quart)
+# ax[1].pcolormesh(vsys, K, Kp_vsys_quart[0])
 
 
 fig, ax = plt.subplots(3, sharex="all", sharey="all")
@@ -438,5 +438,24 @@ ax[2].axhline(
 ax[0].legend()
 ax[1].legend()
 ax[2].legend()
+
+fig, ax = plt.subplots(3)
+ax[0].pcolormesh(vsys, op_pre, Kp_vsys_quart[1][0])
+ax[1].pcolormesh(vsys, op_pre, Kp_vsys_quart[1][150])
+ax[2].plot(vsys, Kp_vsys_quart[0][150])
+
+#
+# n_columns = 10
+# n_rows = 100 // n_columns
+# row = 0
+# column = 0
+# fig, ax = plt.subplots(n_rows, n_columns, figsize=(10, 5), sharey="all")
+# for i in range(100):
+#     ax[row][column].plot(vsys, Kp_vsys_quart[0][i])
+#     column += 1
+#     column = column % n_columns
+#     if column == 0:
+#         row += 1
+#         row = row % n_rows
 
 plt.show()
