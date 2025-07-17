@@ -27,10 +27,10 @@ def Time_Dependent_Spectrum(wl, flux, op, kp, kernel=None, wl_grid=None):
     if len(kernel.shape) > 1:
         convolved_spectrum = np.empty(spectrum.shape)
         for i, ker in enumerate(kernel):
-            convolved_spectrum[i] = np.convolve(spectrum[i], ker, "same")
+            convolved_spectrum[i] = scisig.fftconvolve(spectrum[i], ker, "same")
     else:
         convolved_spectrum = np.array(
-            [np.convolve(i, kernel, "same") for i in spectrum]
+            [scisig.fftconvolve(i, kernel, "same") for i in spectrum]
         )
     return convolved_spectrum
 
