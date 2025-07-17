@@ -50,7 +50,7 @@ ttot = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 + Rpl / Rs) ** 2 - b**2))
 tfull = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 - Rpl / Rs) ** 2 - b**2))
 
 data_wavelengths = (
-        resolving_space(2.4, 2.5, resolution) * 1e-4
+    resolving_space(2.4, 2.5, resolution) * 1e-4
 )  # (cm) generate wavelengths at a constant resolving power
 
 spectral_model_night = SpectralModel(
@@ -124,7 +124,6 @@ ax[0].plot(wl_day[0], rel_flux_day)
 ax[1].plot(wl_night[0], rel_flux_night)
 fig.supxlabel(r"Wavelength ($\mu$m)")
 fig.supylabel(r"Flux ($\Delta$F)")
-plt.show()
 np.savez(
     os.path.join(local_path, "day_night_spectrum.npz"),
     wl_day=wl_day[0],
@@ -143,3 +142,57 @@ np.savez(
     total_transit_time=ttot,
     full_transit_time=tfull,
 )
+
+from functions import Cross_Correlator
+from functions import Time_Dependent_Spectrum
+
+wasp121_post_data = np.load(
+    local_path + "/crires_posteclipse_WASP121_2021-12-15_processed.npz"
+)
+wavelength_grid = wasp121_post_data["W"][-1] * 1e-4  # resolution ~ 300000
+
+wl = wl_day[0]
+
+flux_grid_day = np.interp(wavelength_grid, wl, rel_flux_day)
+
+flux_grid_night = np.interp(wavelength_grid, wl, rel_flux_night)
+
+op = np.linspace(0.334, 0.425, 1001)
+op = np.linspace(0.539, 0.626, 1001)
+
+CO_spec = Time_Dependent_Spectrum(
+    wl=wl,
+    flux=rel_flux_night,
+    op=op,
+    kp=100,
+    wl_grid=wavelength_grid,
+)
+
+H2O_spec = Time_Dependent_Spectrum(
+    wl=wl,
+    flux=rel_flux_day,
+    op=op,
+    kp=100,
+    wl_grid=wavelength_grid,
+)
+
+vsys = np.linspace(-200, 200, 1001)
+
+CC_H2O = Cross_Correlator(
+    wl=wavelength_grid, flux=flux_grid_night, vsys=vsys * 1000, spectrum=H2O_spec
+)
+
+CC_CO = Cross_Correlator(
+    wl=wavelength_grid, flux=flux_grid_day, vsys=vsys * 1000, spectrum=CO_spec
+)
+
+fig, ax = plt.subplots(2, sharex="all", sharey="all")
+vp = 100 * np.sin(2 * np.pi * op)
+ax[0].pcolormesh(vsys, op, CC_H2O)
+ax[1].pcolormesh(vsys, op, CC_CO)
+
+fig, ax = plt.subplots(2, sharex="all", sharey="all")
+ax[0].pcolormesh(wavelength_grid, op, H2O_spec)
+ax[1].pcolormesh(wavelength_grid, op, CO_spec)
+
+plt.show()

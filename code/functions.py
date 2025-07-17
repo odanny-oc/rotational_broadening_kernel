@@ -1,5 +1,6 @@
 import numpy as np
 import astropy.constants as const
+from numpy.core.multiarray import ndarray
 import scipy.signal as scisig
 import time
 
@@ -26,14 +27,14 @@ def Time_Dependent_Spectrum(wl, flux, op, kp, kernel=None, wl_grid=None):
     if len(kernel.shape) > 1:
         convolved_spectrum = np.empty(spectrum.shape)
         for i, ker in enumerate(kernel):
-            convolved_spectrum[i] = scisig.fftconvolve(spectrum[i], ker, "same")
+            convolved_spectrum[i] = np.convolve(spectrum[i], ker, "same")
     else:
         convolved_spectrum = np.array(
-            [scisig.fftconvolve(i, kernel, "same") for i in spectrum]
+            [np.convolve(i, kernel, "same") for i in spectrum]
         )
     return convolved_spectrum
 
-# @timer
+
 def Cross_Correlator(wl, flux, vsys, spectrum):
     wl_doppler = np.outer(1 - vsys / const.c.value, wl)
     model = np.interp(wl_doppler, wl, flux)
@@ -41,21 +42,24 @@ def Cross_Correlator(wl, flux, vsys, spectrum):
     return CC
 
 
-def Kp_vsys_Plotter(K, vsys, op, CC):
+def Kp_vsys_Plotter(K, vsys, op, CC, vsys_kp=None):
     K_vsys_map = np.empty((K.size, vsys.size))
     CC_array = np.empty(CC.shape)
     CC_shifted = np.empty((K.size, CC.shape[0], CC.shape[1]))
     for i, kp in enumerate(K):
         vp = kp * np.sin(2 * np.pi * op)
         for j, vel in enumerate(vp):
-            CC_array[j] = np.interp(vsys + vel, vsys, CC[j])
+            if not isinstance(vsys, np.ndarray):
+                CC_array[j] = np.interp(vsys + vel, vsys, CC[j])
+            else:
+                CC_array[j] = np.interp(vsys_kp + vel, vsys, CC[j])
         K_vsys_map[i] = np.sum(CC_array, axis=0)
         CC_shifted[i] = CC_array
     return K_vsys_map, CC_shifted
 
 
 def Kp_vsys_Map_from_Flux(
-    wl, flux, op, vsys, kp, ker=None, K=None, wl_grid=None, flux_grid=None
+    wl, flux, op, vsys, kp, ker=None, K=None, wl_grid=None, flux_grid=None, vsys_kp=None
 ):
     if not isinstance(K, np.ndarray):
         K = np.linspace(0, 2 * kp, 1001)
@@ -64,7 +68,10 @@ def Kp_vsys_Map_from_Flux(
         CC = Cross_Correlator(wl, flux, vsys * 1000, convolved_spectrum)
     else:
         CC = Cross_Correlator(wl_grid, flux_grid, vsys * 1000, convolved_spectrum)
-    Kp_vsys_plot, _ = Kp_vsys_Plotter(K, vsys, op, CC)
+    if not isinstance(vsys_kp, np.ndarray):
+        Kp_vsys_plot, _ = Kp_vsys_Plotter(K, vsys, op, CC)
+    else: 
+        Kp_vsys_plot, _ = Kp_vsys_Plotter(K, vsys, op, CC, vsys_kp=vsys_kp)
     return Kp_vsys_plot, K
 
 def maxIndex(a):
