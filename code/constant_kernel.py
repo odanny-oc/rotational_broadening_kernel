@@ -45,11 +45,10 @@ tfull = (
     period / np.pi * np.arcsin(Rs / a * np.sqrt((1 - Rpl / Rs) ** 2 - b**2))
 )  # Tfull
 eclipse_end = 0.5 - tfull / period
-# veq = 2 * np.pi * Rpl / period  # km/s
-veq = 50
+veq = 2 * np.pi * Rpl / period  # km/s
 
 
-def broadening_kernel_orbital_phase(x, op):
+def broadening_kernel_orbital_phase(x, op, veq):
     if not isinstance(op, np.ndarray):
         op = np.array([op])
     kernel_array = np.zeros(shape=(op.shape[0], x.shape[0]))
@@ -124,25 +123,27 @@ def broadening_kernel_orbital_phase(x, op):
         return kernel_array, full_kernel
 
 
+def delta(x: np.ndarray, point: float, tol: float) -> np.ndarray:
+    delta_function = np.zeros_like(x)
+    index = (
+        np.where((x < point + tol) & (x > point - tol))[-1][-1]
+        + np.where((x < point + tol) & (x > point - tol))[0][0]
+    ) // 2
+    delta_function[index] = 1
+    return delta_function
+
+
 resolution = 400000
 dv = const.c.value * 1e-3 / resolution
 points_number = 51
 n_exposure = 300
 kernel_res = n_exposure // 2
-range_vel = 5
+range_vel = 1
 
 orbital_phase_pre_eclipse = np.linspace(0.334, 0.425, n_exposure)  # time/period
 orbital_phase_post_eclipse = np.linspace(0.539, 0.626, n_exposure)  # time/period
 
 x = np.linspace(-range_vel, range_vel, points_number) * (points_number // 2) * dv
-
-time_dependent_broadening_kernels_pre_eclipse, ref_kernel = (
-    broadening_kernel_orbital_phase(x, orbital_phase_pre_eclipse)
-)
-
-time_dependent_broadening_kernels_post_eclipse, ref_kernel = (
-    broadening_kernel_orbital_phase(x, orbital_phase_post_eclipse)
-)
 
 # ecclipse_phase = np.linspace(0, 1, n_exposure)
 # ecclipse_kernels = broadening_kernel_orbital_phase(x, ecclipse_phase)
@@ -169,34 +170,71 @@ flux -= np.mean(flux)
 
 op_test = 0.25
 
-test_kernel, full_kernel, normaliser = broadening_kernel_orbital_phase(x, op_test)
+test_kernel, full_kernel, normaliser = broadening_kernel_orbital_phase(x, op_test, 15)
 
-print(np.sum(full_kernel), normaliser, np.sum(test_kernel))
+test_kernel2, _, normaliser2 = broadening_kernel_orbital_phase(x, op_test, 5)
+
+x_range = np.linspace(-5, 5, points_number) * dv * points_number // 2
+kernel_range, _, kernel_range_norm = broadening_kernel_orbital_phase(x_range, op_test, 50)
+
 # Renormalise test_kernel
 test_kernel *= normaliser
 test_kernel /= np.sum(test_kernel)
-print(np.sum(test_kernel))
 
-fig, ax = plt.subplots()
-ax.plot(wl, flux)
-fig.supxlabel("Wavelength (microns)")
-fig.supylabel("Flux")
+test_kernel2 *= normaliser2
+test_kernel2 /= np.sum(test_kernel2)
+
+kernel_range *= kernel_range_norm
+kernel_range /= np.sum(kernel_range)
 
 full_flux = scisig.fftconvolve(flux, full_kernel, "same")
 
 test_flux = scisig.fftconvolve(flux, test_kernel, "same")
 
-ax.plot(wl, full_flux)
-ax.plot(wl, test_flux)
+test_flux2 = scisig.fftconvolve(flux, test_kernel2, "same")
+
+flux_range = scisig.fftconvolve(flux, kernel_range, "same")
 
 shift = 5
 wavelenght_shift = wl * (1 + (shift * 1000) / const.c.value)
-flux_shift = np.interp(wavelenght_shift, wl, full_flux)
+flux_shift = np.interp(wavelenght_shift, wl, flux)
 
-ax.plot(wl, flux_shift)
+x2 = np.linspace(-5, 5, 101)
+x3 = np.linspace(-0.5, 0.5, 101)
+
+delta_kernel = delta(x2, -3, 0.3)
+delta_kernel2 = delta(x3, -0.3, 0.03)
+
+flux_shift_kernel = scisig.fftconvolve(flux, delta_kernel, "same")
+flux_shift_kernel2 = scisig.fftconvolve(flux, delta_kernel2, "same")
+
+fig, ax = plt.subplots()
+fig.supxlabel("Wavelength (microns)")
+fig.supylabel("Flux")
+ax.plot(wl, flux, label="Unshifted")
+ax.plot(wl, flux_shift, label=f"Doppler Shifted {shift}km/s")
+ax.plot(wl, flux_shift_kernel, label=f"Shifted By Delta Kernel")
+ax.plot(wl, flux_shift_kernel2, label=f"Shifted By Delta Kernel 2")
+ax.legend()
+
+fig, ax = plt.subplots()
+ax.plot(wl, flux, label="Unshifted")
+ax.plot(wl, test_flux, label=f"Veq 15 km/s")
+ax.plot(wl, test_flux2, label=f"Veq 5 km/s")
+ax.plot(wl, flux_range, label=f"Veq 50 km/s and range changed")
+ax.legend()
+
+fig, ax = plt.subplots()
+ax.plot(x_range, kernel_range)
+
+# vel = np.linspace(1000, 2000, 1001)
+# fig, ax = plt.subplots()
+# ax.plot(vel, 1 + vel/const.c.value)
 
 fig, ax = plt.subplots(2, sharex="all", sharey="all")
 ax[0].plot(x, test_kernel)
+ax[0].plot(x, test_kernel2)
+
 ax[1].plot(x, full_kernel)
 
 vsys = np.linspace(50, 200, 1501)
@@ -216,9 +254,7 @@ CC_shifted = Cross_Correlator(
     wl=wl, flux=flux, vsys=vsys * 1000, spectrum=shifted_spectrum
 )
 
-CC_full = Cross_Correlator(
-    wl=wl, flux=flux, vsys=vsys * 1000, spectrum=full_spectrum
-)
+CC_full = Cross_Correlator(wl=wl, flux=flux, vsys=vsys * 1000, spectrum=full_spectrum)
 
 fig, ax = plt.subplots(3)
 ax[0].pcolormesh(vsys, op, CC)
