@@ -6,6 +6,7 @@ from functions import Cross_Correlator
 from functions import Kp_vsys_Plotter
 from functions import Kp_vsys_Map_from_Flux
 from functions import maxIndex
+from functions import vel_array
 from astropy import constants as const
 import scipy.signal as scisig
 import time
@@ -37,11 +38,10 @@ tfull = (
 )  # Tfull
 eclipse_end = 0.5 - tfull / period
 veq = 2 * np.pi * Rpl / period  # km/s
-# veq = 50
-
+# veq = 500
 
 # x kernel range and op orbital phase
-def Broadening_Kernel_OP(x, op):
+def broadening_kernel_op(x, op):
     # Allows float or int values of op to be passed
     if not isinstance(op, np.ndarray):
         op = np.array([op])
@@ -137,29 +137,28 @@ def Broadening_Kernel_OP(x, op):
 
 
 resolution = 400000
-dv = const.c.value * 1e-3 / resolution
-points_number = 51
 n_exposure = 300
-kernel_res = n_exposure // 2
-range_vel = 1
 
-orbital_phase_pre_eclipse = np.linspace(0.334, 0.425, n_exposure)  # time/period
-orbital_phase_post_eclipse = np.linspace(0.539, 0.626, n_exposure)  # time/period
+orbital_phase_pre_eclipse = np.linspace(0.33, 0.43, n_exposure)  # time/period
+orbital_phase_post_eclipse = np.linspace(0.55, 0.66, n_exposure)  # time/period
 
-x = np.linspace(-range_vel, range_vel, points_number) * (points_number // 2) * dv
+# orbital_phase_pre_eclipse = np.linspace(-0.12, -0.04, n_exposure)  # time/period
+# orbital_phase_post_eclipse = np.linspace(0.04, 0.12, n_exposure)  # time/period
 
-time_dependent_broadening_kernels_pre_eclipse, ref_kernel = Broadening_Kernel_OP(
+x = vel_array(50, resolution)
+
+time_dependent_broadening_kernels_pre_eclipse, ref_kernel = broadening_kernel_op(
     x, orbital_phase_pre_eclipse
 )
 
-anti_kernels_pre_eclipse, ref_kernel = Broadening_Kernel_OP(
+anti_kernels_pre_eclipse, ref_kernel = broadening_kernel_op(
     x, orbital_phase_pre_eclipse - 0.5
 )
 
-time_dependent_broadening_kernels_post_eclipse, ref_kernel = Broadening_Kernel_OP(
+time_dependent_broadening_kernels_post_eclipse, ref_kernel = broadening_kernel_op(
     x, orbital_phase_post_eclipse
 )
-anti_kernels_post_eclipse, ref_kernel = Broadening_Kernel_OP(
+anti_kernels_post_eclipse, ref_kernel = broadening_kernel_op(
     x, orbital_phase_post_eclipse - 0.5
 )
 
@@ -180,7 +179,7 @@ anti_kernels_post_eclipse, ref_kernel = Broadening_Kernel_OP(
 #         row = row % n_rows
 
 fig, ax = plt.subplots()
-ax.plot(x, Broadening_Kernel_OP(x, 0.25)[0], "o", markersize=0.8)
+ax.plot(x, broadening_kernel_op(x, 0.25)[0], "o", markersize=0.8)
 
 # Define Wavelength and Flux Grids
 wl = day_night_atmosphere["wl_day"]
@@ -216,11 +215,10 @@ total_convolved_spectrum_pre = (
 )
 
 vsys = np.linspace(-200, 200, 1001)
-vsys_kp = np.linspace(-50, 50, 1001)
-K = np.linspace(Kp - 15, Kp + 15, 1001)
+vsys_kp = np.linspace(-30, 30, 1001)
+K = np.linspace(Kp - 85, Kp + 85, 1001)
 
-flux_model = scisig.fftconvolve(flux_day + flux_night, ref_kernel, "same")
-
+flux_model = scisig.fftconvolve(flux_tot, ref_kernel, "same")
 
 CC_pre = Cross_Correlator(wl, flux_tot, vsys * 1000, total_convolved_spectrum_pre)
 
@@ -232,29 +230,12 @@ K_vsys_map_pre_eclipse, CC_shifted = Kp_vsys_Plotter(
     vsys_kp=vsys_kp,
 )
 
-# fig, ax = plt.subplots(3)
-# ax[0].pcolormesh(vsys, orbital_phase_pre_eclipse, CC_pre)
-# ax[0].set_xlabel("System Velocity (km/s)")
-# ax[0].set_ylabel("Orbital Phase")
-#
-# index = 500
-# cc_sum = K_vsys_map_pre_eclipse[index]
-#
-# ax[1].pcolormesh(vsys, orbital_phase_pre_eclipse, CC_shifted[index])
-# ax[1].set_xlabel("System Velocity (km/s)")
-# ax[1].set_ylabel("Orbital Phase")
-#
-# ax[2].plot(vsys_kp, cc_sum)
-# ax[2].set_xlabel("System Velocity (km/s)")
-# ax[2].set_ylabel("Cross Correlation Sum")
-
 convolved_spectrum_post_eclipse_day = Time_Dependent_Spectrum(
     wl,
     flux_day,
     orbital_phase_post_eclipse,
     Kp,
     time_dependent_broadening_kernels_post_eclipse,
-    # wl_grid=wavelength_grid,
 )
 
 convolved_spectrum_post_eclipse_night = Time_Dependent_Spectrum(
@@ -263,7 +244,6 @@ convolved_spectrum_post_eclipse_night = Time_Dependent_Spectrum(
     orbital_phase_post_eclipse,
     Kp,
     anti_kernels_post_eclipse,
-    # wl_grid=wavelength_grid,
 )
 
 total_convolved_spectrum_post = (
@@ -319,7 +299,13 @@ ax[0].axhline(
     lw=0.5,
     label=r"Measured $K_p$ = " + f"{Kp_from_plot:.2f}km/s",
 )
-ax[0].axvline(vsys_kp[max_lines[1]], ls="--", color="blue", lw=0.5)
+ax[0].axvline(
+    vsys_kp[max_lines[1]],
+    ls="--",
+    color="blue",
+    lw=0.5,
+    label=f"Measured vsys = {vsys_kp[max_lines[1]]:.2f}",
+)
 ax[0].legend(
     edgecolor="k",
     facecolor="w",
@@ -347,7 +333,14 @@ ax[1].axhline(
     lw=0.5,
     label=r"Measured $K_p$ = " + f"{K_array[max_unconv[0]]:.2f}km/s",
 )
-ax[1].axvline(vsys_kp[max_unconv[1]], ls="--", color="blue", lw=0.5)
+ax[1].axvline(
+    vsys_kp[max_unconv[1]],
+    ls="--",
+    color="blue",
+    lw=0.5,
+    label=f"Measured vsys = {vsys_kp[max_unconv[1]]:.2f}",
+)
+
 ax[1].legend(
     loc="upper left",
     edgecolor="k",
@@ -355,6 +348,7 @@ ax[1].legend(
     framealpha=1,
     fancybox=True,
 )
+
 ax[1].annotate(
     r"$\Delta K_p$ = " + f"{( Kp - K_array[max_unconv[0]] ):.2f}km/s",
     xy=(0.9, 0.85),
@@ -412,6 +406,7 @@ ax[2].axvline(
     ls="--",
     color="blue",
     lw=0.5,
+    label=f"Measured vsys = {vsys_kp[maxIndex(gaussian_convolved_tot)[1]]:.2f}",
 )
 ax[2].legend(
     loc="upper left",
@@ -531,27 +526,9 @@ def kp_fitter(kp, op):
     return kp * np.sin(2 * np.pi * op)
 
 
-Kp_fit_pre = K[maxIndex(K_vsys_map_pre_eclipse)[0]] * np.sin(
-    2 * np.pi * orbital_phase_pre_eclipse
-)
-
-Kp_fit_post = kp_fitter(
-    K[maxIndex(K_vsys_map_post_eclipse)[0]], orbital_phase_post_eclipse
-)
-
 fig, ax = plt.subplots(2)
 fig.suptitle("Pre-Eclipse")
 ax[0].pcolormesh(vsys, orbital_phase_pre_eclipse, CC_day_pre)
-
-ax[0].plot(Kp_fit_pre, orbital_phase_pre_eclipse, ls="--", color="red")
-
-ax[0].plot(
-    kp_fitter(K[maxIndex(Kp_vsys_night)[0]], orbital_phase_pre_eclipse),
-    orbital_phase_pre_eclipse,
-    ls="--",
-    color="blue",
-    label=f"Kp Night side = {K[maxIndex(Kp_vsys_night)[0]]:.2f}",
-)
 
 ax[0].plot(
     kp_fitter(K[maxIndex(Kp_vsys_day)[0]], orbital_phase_pre_eclipse),
@@ -566,20 +543,13 @@ ax[0].plot(
     orbital_phase_pre_eclipse,
     ls="--",
     color="pink",
-    label=f"Kp = {Kp:.2f}",
+    label=f"Kp = {Kp:.2f} plus vsys from day = {vsys_kp[maxIndex(Kp_vsys_day)[1]]:.2f}",
 )
 
-ax[0].legend(loc='upper left')
+ax[0].legend(loc="upper left")
 
 ax[1].pcolormesh(vsys, orbital_phase_pre_eclipse, CC_night_pre)
 
-ax[1].plot(
-    Kp_fit_pre,
-    orbital_phase_pre_eclipse,
-    ls="--",
-    color="red",
-    label=f"Kp = {K[maxIndex(K_vsys_map_pre_eclipse)[0]]:.2f}",
-)
 
 ax[1].plot(
     kp_fitter(K[maxIndex(Kp_vsys_night)[0]], orbital_phase_pre_eclipse),
@@ -595,14 +565,6 @@ ax[1].plot(
     ls="--",
     color="pink",
     label=f"Kp = {Kp:.2f}",
-)
-
-ax[1].plot(
-    kp_fitter(K[maxIndex(Kp_vsys_night_pre)[0]], orbital_phase_pre_eclipse),
-    orbital_phase_pre_eclipse,
-    ls="--",
-    color="blue",
-    label=f"Kp = {K[maxIndex(Kp_vsys_night_pre)[0]]:.2f}",
 )
 
 ax[1].legend(loc="upper left")
@@ -621,6 +583,43 @@ ax[0].pcolormesh(vsys, orbital_phase_post_eclipse, CC_day_post)
 ax[1].pcolormesh(vsys, orbital_phase_post_eclipse, CC_night_post)
 ax[0].set_title("Cross Correlation Day Side")
 ax[1].set_title("Cross Correlation Night Side")
+
+ax[1].plot(
+    kp_fitter(K[maxIndex(Kp_vsys_night)[0]], orbital_phase_post_eclipse),
+    orbital_phase_post_eclipse,
+    ls="--",
+    color="blue",
+    label=f"Kp Night side = {K[maxIndex(Kp_vsys_night)[0]]:.2f}",
+)
+
+ax[1].plot(
+    kp_fitter(Kp, orbital_phase_post_eclipse),
+    orbital_phase_post_eclipse,
+    ls="--",
+    color="pink",
+    label=f"Kp = {Kp:.2f}",
+)
+
+ax[0].plot(
+    kp_fitter(K[maxIndex(Kp_vsys_day)[0]], orbital_phase_post_eclipse),
+    orbital_phase_post_eclipse,
+    ls="--",
+    color="orange",
+    label=f"Kp Day Side = {K[maxIndex(Kp_vsys_day)[0]]:.2f}",
+)
+
+ax[0].plot(
+    kp_fitter(Kp, orbital_phase_post_eclipse),
+    orbital_phase_post_eclipse,
+    ls="--",
+    color="pink",
+    label=f"Kp = {Kp:.2f}",
+)
+
+ax[0].legend()
+
+ax[1].legend()
+
 fig.supxlabel(r"$v_{\text{sys}}$")
 fig.supylabel(r"Orbital Phase")
 

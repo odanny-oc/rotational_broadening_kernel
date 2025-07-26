@@ -47,6 +47,28 @@ tfull = (
 eclipse_end = 0.5 - tfull / period
 veq = 2 * np.pi * Rpl / period  # km/s
 
+def vel_array(vmax,R,get_edges=False):
+  """
+  Simple function to return a velocity scale from at least -vmax to vmax with a given
+
+  resolution. In km/s.
+  """
+
+  dv = const.c.value*1e-3 / R # get vel spacing  
+
+  n = np.ceil(vmax / dv) # get number of steps required
+
+  N = 2*int(n)+1 # get total number of steps
+
+  v = np.linspace(-n*dv,n*dv,N) # set velocity array with spacing dv
+
+  # if get_edges:
+  #
+  #   edges = np.hstack([1.5*v[0]-0.5*v[1],0.5*(v[1:]+v[:-1]),1.5*v[-1]-0.5*v[-2]])
+  #
+  #   return v,edges
+
+  return v
 
 def broadening_kernel_orbital_phase(x, op, veq):
     if not isinstance(op, np.ndarray):
@@ -70,7 +92,7 @@ def broadening_kernel_orbital_phase(x, op, veq):
 
         vel = veq * np.cos(2 * np.pi * ref_op)
 
-        if vel == 0:
+        if vel == 0 or ref_op == 0.25:
             kernel = ref_kernel
             if ref_op < 0.5:
                 kernel = np.flip(kernel)
@@ -143,7 +165,9 @@ range_vel = 1
 orbital_phase_pre_eclipse = np.linspace(0.334, 0.425, n_exposure)  # time/period
 orbital_phase_post_eclipse = np.linspace(0.539, 0.626, n_exposure)  # time/period
 
-x = np.linspace(-range_vel, range_vel, points_number) * (points_number // 2) * dv
+# x = np.linspace(-range_vel, range_vel, points_number) * (points_number // 2) * dv
+x = vel_array(20, resolution)
+
 
 # ecclipse_phase = np.linspace(0, 1, n_exposure)
 # ecclipse_kernels = broadening_kernel_orbital_phase(x, ecclipse_phase)
@@ -174,7 +198,8 @@ test_kernel, full_kernel, normaliser = broadening_kernel_orbital_phase(x, op_tes
 
 test_kernel2, _, normaliser2 = broadening_kernel_orbital_phase(x, op_test, 5)
 
-x_range = np.linspace(-5, 5, points_number) * dv * points_number // 2
+points_number = 201
+x_range = vel_array(85, resolution)
 kernel_range, _, kernel_range_norm = broadening_kernel_orbital_phase(x_range, op_test, 50)
 
 # Renormalise test_kernel
@@ -202,8 +227,10 @@ flux_shift = np.interp(wavelenght_shift, wl, flux)
 x2 = np.linspace(-5, 5, 101)
 x3 = np.linspace(-0.5, 0.5, 101)
 
-delta_kernel = delta(x2, -3, 0.3)
-delta_kernel2 = delta(x3, -0.3, 0.03)
+delta_kernel = delta(x, -3, 0.3)
+delta_kernel2 = delta(x_range, -5, 0.5)
+print(np.gradient(x_range))
+print(np.gradient(x))
 
 flux_shift_kernel = scisig.fftconvolve(flux, delta_kernel, "same")
 flux_shift_kernel2 = scisig.fftconvolve(flux, delta_kernel2, "same")

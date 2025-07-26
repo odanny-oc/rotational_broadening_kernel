@@ -11,6 +11,22 @@ def timer(func):
         print(f"{func.__name__} -- %s seconds" % (time.time() - start_time))
     return wrapper
 
+def vel_array(vmax, R):
+
+  """
+  Simple function to return a velocity scale from at least -vmax to vmax with a given resolution. In km/s.
+
+  """
+
+  dv = const.c.value * 1e-3 / R # get vel spacing  
+
+  n = np.ceil(vmax / dv) # get number of steps required
+
+  N = 2*int(n)+1 # get total number of steps
+
+  v = np.linspace(-n*dv,n*dv,N) # set velocity array with spacing dv
+
+  return v  
 
 def Time_Dependent_Spectrum(wl, flux, op, kp, kernel=None, wl_grid=None):
     vp = kp * np.sin(2 * np.pi * op)
@@ -20,18 +36,19 @@ def Time_Dependent_Spectrum(wl, flux, op, kp, kernel=None, wl_grid=None):
     else:
         Wavelengths = np.outer(1 - vp * 1000 / const.c.value, wl_grid)
 
-    spectrum = np.interp(Wavelengths, wl, flux)
     if not isinstance(kernel, np.ndarray):
+        spectrum = np.interp(Wavelengths, wl, flux)
         return spectrum
 
-    if len(kernel.shape) > 1:
-        convolved_spectrum = np.empty(spectrum.shape)
-        for i, ker in enumerate(kernel):
-            convolved_spectrum[i] = scisig.fftconvolve(spectrum[i], ker, "same")
     else:
-        convolved_spectrum = np.array(
-            [scisig.fftconvolve(i, kernel, "same") for i in spectrum]
-        )
+        if len(kernel.shape) > 1:
+            convolved_spectrum = np.empty(Wavelengths.shape)
+            for i, op in enumerate(op):
+                convolved_flux = scisig.fftconvolve(flux, kernel[i], "same")
+                convolved_spectrum[i] = np.interp(Wavelengths[i], wl, convolved_flux)
+        else:
+            convolved_flux = scisig.fftconvolve(flux, kernel, 'same')
+            convolved_spectrum = np.interp(Wavelengths, wl, convolved_flux)
     return convolved_spectrum
 
 
@@ -49,7 +66,7 @@ def Kp_vsys_Plotter(K, vsys, op, CC, vsys_kp=None):
     for i, kp in enumerate(K):
         vp = kp * np.sin(2 * np.pi * op)
         for j, vel in enumerate(vp):
-            if not isinstance(vsys, np.ndarray):
+            if not isinstance(vsys_kp, np.ndarray):
                 CC_array[j] = np.interp(vsys + vel, vsys, CC[j])
             else:
                 CC_array[j] = np.interp(vsys_kp + vel, vsys, CC[j])

@@ -50,7 +50,7 @@ ttot = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 + Rpl / Rs) ** 2 - b**2))
 tfull = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 - Rpl / Rs) ** 2 - b**2))
 
 data_wavelengths = (
-    resolving_space(2.4, 2.5, resolution) * 1e-4
+    resolving_space(2.45, 2.5, resolution) * 1e-4
 )  # (cm) generate wavelengths at a constant resolving power
 
 spectral_model_night = SpectralModel(
@@ -65,7 +65,7 @@ spectral_model_night = SpectralModel(
     reference_pressure=1e-2,
     # Temperature profile parameters
     temperature_profile_mode="guillot",
-    temperature=2000,
+    temperature=1700,
     intrinsic_temperature=0,
     guillot_temperature_profile_gamma=0.4,
     guillot_temperature_profile_infrared_mean_opacity_solar_metallicity=0.01,
