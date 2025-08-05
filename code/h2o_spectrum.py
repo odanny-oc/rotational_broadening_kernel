@@ -1,20 +1,32 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import os
+import matplotlib as mpl
+import scipy.signal as scisig
+import os, subprocess
 from astropy import constants as const
 from petitRADTRANS import physical_constants as cst, planet
 from petitRADTRANS.physics import temperature_profile_function_guillot_global
 from petitRADTRANS.spectral_model import SpectralModel
 from petitRADTRANS.math import resolving_space
 from petitRADTRANS.planet import Planet
+from petitRADTRANS.config import petitradtrans_config_parser
 
-# import SysRem
+import SysRem
 
 home_path = os.environ["HOME"]
 local_path = home_path + "/exoplanet_atmospheres/code"
+local_images = home_path + "/exoplanet_atmospheres/images"
 
-#choose resolution higher than wavelength_grid >300000
 resolution = 400000
+
+wasp121_pre_data = np.load(
+    os.path.join(local_path, "crires_preeclipse_WASP121_2022-02-14_processed.npz")
+)
+
+wasp121_post_data = np.load(
+    local_path + "/crires_posteclipse_WASP121_2021-12-15_processed.npz"
+)
+wavelength_grid = wasp121_pre_data['W'][9] * 1e-4
 
 
 def black_body(wl, T):
@@ -44,15 +56,16 @@ ttot = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 + Rpl / Rs) ** 2 - b**2))
 tfull = period / np.pi * np.arcsin(Rs / a * np.sqrt((1 - Rpl / Rs) ** 2 - b**2))
 
 data_wavelengths = (
-    resolving_space(2.1, 2.2, resolution) * 1e-4
+    resolving_space(2.2, 2.3, resolution) * 1e-4
 )  # (cm) generate wavelengths at a constant resolving power
 
-spectral_model = SpectralModel(
+
+spectral_model_day = SpectralModel(
     # Radtrans parameters
     pressures=np.logspace(-12, 2, 100),
     line_opacity_mode="lbl",
     # line_by_line_opacity_sampling= 5,
-    line_species=["Fe", "CO", "H2O"],
+    line_species=["H2O"],
     # Planet parameters
     planet_radius=Rpl,
     reference_gravity=const.G.value * Mpl / (Rpl**2),
@@ -64,11 +77,7 @@ spectral_model = SpectralModel(
     guillot_temperature_profile_gamma=0.4,
     guillot_temperature_profile_infrared_mean_opacity_solar_metallicity=0.01,
     # Mass fractions
-    imposed_mass_fractions={  # these can also be arrays of the same size as pressures
-        "Fe": 1e-6,
-        "CO": 1e-3,
-        "H2O": 1e-2,
-    },
+    imposed_mass_fractions={"H2O": 1e-3, "CO": 1e-6},
     filling_species={  # automatically fill the atmosphere with H2 and He, such that the sum of MMRs is equal to 1 and H2/He = 37/12
         "H2": 37,
         "He": 12,
@@ -76,29 +85,27 @@ spectral_model = SpectralModel(
     rebinned_wavelengths=data_wavelengths,  # (cm) used for the rebinning, and also to set the wavelengths boundaries
 )
 
-wl, flux = spectral_model.calculate_spectrum(mode="emission")
-wl *= 1e4
+wl_spec, flux = spectral_model_day.calculate_spectrum(mode="emission")
+wl_spec *= 1e4
 
 star_spectrum = (
-    black_body(wl * 1e-6, 6430)[0] * 1e7 * 1e-6
+    black_body(wl_spec * 1e-6, 6430)[0] * 1e7 * 1e-6
 )  # Joules to ergs and m^-3 to cm^-3
-fig, ax = plt.subplots()
-ax.plot(wl[0], star_spectrum)
 
 rel_flux = np.pi * Rpl**2 * flux[0] / (np.pi * Rs**2 * np.pi * star_spectrum)
 
-fig, ax = plt.subplots()
-ax.plot(wl[0], flux[0])
-ax.set_xlabel(r"Wavelength ($\mu$m)")
-ax.set_ylabel(r"Flux (ergs s$^{-1}$ cm$^{-2}$ cm$^{-1}$")
+wl = wl_spec[0]
 
-fig, ax = plt.subplots()
-ax.plot(wl[0], rel_flux)
-ax.set_xlabel(r"Wavelength ($\mu$m)")
-ax.set_ylabel(r"Flux ($\Delta$F)")
+fitted_flux = np.interp(wavelength_grid, wl, rel_flux)
+
+fig, ax = plt.subplots(2)
+ax[0].plot(wavelength_grid, fitted_flux)
+ax[1].plot(wl, rel_flux)
+fig.supxlabel(r"Wavelength ($\mu$m)")
+fig.supylabel(r"Flux ($\Delta$F)")
 np.savez(
-    os.path.join(local_path, "wasp121b.npz"),
-    wl=wl[0],
+    os.path.join(local_path, "h2o_spectrum.npz"),
+    wl=wl_spec[0],
     flux=rel_flux,
     radius_planet=Rpl * 1e-5,
     radius_star=Rs * 1e-5,

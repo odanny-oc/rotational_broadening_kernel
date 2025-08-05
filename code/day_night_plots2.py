@@ -38,7 +38,7 @@ tfull = (
 )  # Tfull
 eclipse_end = 0.5 - tfull / period
 veq = 2 * np.pi * Rpl / period  # km/s
-# veq = 500
+# veq = 350
 
 # x kernel range and op orbital phase
 def broadening_kernel_op(x, op):
@@ -49,6 +49,7 @@ def broadening_kernel_op(x, op):
     veq_local = veq
 
     kernel_array = np.zeros(shape=(op.shape[0], x.shape[0]))
+    kernel_range_array = []
     # Sets valid range given veq
     ref_range = np.array([i for i in x if abs(i) <= veq_local])
 
@@ -76,6 +77,7 @@ def broadening_kernel_op(x, op):
         # Consider 0 case
         if vel == 0:
             kernel = ref_kernel
+            kernel_range = ref_range
             # Consider opposite side of orbit
             if ref_op < 0.5:
                 kernel = np.flip(kernel)
@@ -90,6 +92,7 @@ def broadening_kernel_op(x, op):
                     ref_op + 0.5
                 ) < tfull / (2 * period):
                     kernel = np.zeros(x.shape[0])
+                    kernel_range = kernel
                 else:
                     # Gradually reduce signal otherwise (from left or from right depending on op)
                     if ref_op > 0:
@@ -101,9 +104,9 @@ def broadening_kernel_op(x, op):
                             (2 * np.pi * (ref_op + 0.5)) * (period_scaler)
                         )
                     # Create kernel
-                    range = np.array([i for i in x if abs(i) <= abs(vel)])
-                    kernel = np.sqrt(1 - (range / abs(vel)) ** 2) / normaliser
-                    padding = abs(x.shape[0] - range.shape[0]) // 2
+                    kernel_range = np.array([i for i in x if abs(i) <= abs(vel)])
+                    kernel = np.sqrt(1 - (kernel_range / abs(vel)) ** 2) / normaliser
+                    padding = abs(x.shape[0] - kernel_range.shape[0]) // 2
                     kernel = np.pad(kernel, padding, "constant")
                     if vel < 0:
                         kernel[x.shape[0] // 2 :] = np.zeros(x.shape[0] // 2 + 1)
@@ -115,9 +118,9 @@ def broadening_kernel_op(x, op):
                         kernel = np.flip(kernel)
             # Else not about to be eclipsed takes original value of vel
             else:
-                range = np.array([i for i in x if abs(i) <= abs(vel)])
-                kernel = np.sqrt(1 - (range / abs(vel)) ** 2) / normaliser
-                padding = abs(x.shape[0] - range.shape[0]) // 2
+                kernel_range = np.array([i for i in x if abs(i) <= abs(vel)])
+                kernel = np.sqrt(1 - (kernel_range / abs(vel)) ** 2) / normaliser
+                padding = abs(x.shape[0] - kernel_range.shape[0]) // 2
                 kernel = np.pad(kernel, padding, "constant")
                 if vel < 0:
                     kernel[x.shape[0] // 2 :] = np.zeros(x.shape[0] // 2 + 1)
@@ -129,57 +132,52 @@ def broadening_kernel_op(x, op):
                     kernel = np.flip(kernel)
         # Saves kernel to kernel array
         kernel_array[i] = kernel
+        kernel_range_array.append(kernel_range)
 
     if kernel_array.shape[0] == 1:
-        return kernel_array[0], full_kernel
+        return kernel_array[0], kernel_range_array
     else:
-        return kernel_array, full_kernel
+        return kernel_array, kernel_range_array
 
 
 resolution = 400000
 n_exposure = 300
 
-orbital_phase_pre_eclipse = np.linspace(0.33, 0.43, n_exposure)  # time/period
-orbital_phase_post_eclipse = np.linspace(0.55, 0.66, n_exposure)  # time/period
+# orbital_phase_pre_eclipse = np.linspace(0.33, 0.43, n_exposure)  # time/period
+# orbital_phase_post_eclipse = np.linspace(0.55, 0.66, n_exposure)  # time/period
 
-# orbital_phase_pre_eclipse = np.linspace(-0.12, -0.04, n_exposure)  # time/period
-# orbital_phase_post_eclipse = np.linspace(0.04, 0.12, n_exposure)  # time/period
+orbital_phase_pre_eclipse = np.linspace(-0.12, -0.04, n_exposure)  # time/period
+orbital_phase_post_eclipse = np.linspace(0.04, 0.12, n_exposure)  # time/period
 
-x = vel_array(50, resolution)
+x = vel_array(30, resolution)
 
-time_dependent_broadening_kernels_pre_eclipse, ref_kernel = broadening_kernel_op(
+time_dependent_broadening_kernels_pre_eclipse, kernel_range_pre = broadening_kernel_op(
     x, orbital_phase_pre_eclipse
 )
 
-anti_kernels_pre_eclipse, ref_kernel = broadening_kernel_op(
+anti_kernels_pre_eclipse, anti_kernel_range_pre = broadening_kernel_op(
     x, orbital_phase_pre_eclipse - 0.5
 )
 
-time_dependent_broadening_kernels_post_eclipse, ref_kernel = broadening_kernel_op(
+time_dependent_broadening_kernels_post_eclipse, kernel_range_post = broadening_kernel_op(
     x, orbital_phase_post_eclipse
 )
-anti_kernels_post_eclipse, ref_kernel = broadening_kernel_op(
+anti_kernels_post_eclipse, anti_kernel_range_post  = broadening_kernel_op(
     x, orbital_phase_post_eclipse - 0.5
 )
 
-# n_columns = 10
-# n_rows = n_exposure // n_columns
-# row = 0
-# column = 0
-# fig, ax = plt.subplots(n_rows, n_columns, figsize=(10, 5), sharey="all")
-# for i, j in zip(
-#     time_dependent_broadening_kernels_pre_eclipse, anti_kernels_pre_eclipse
-# ):
-#     ax[row][column].plot(x, i)
-#     ax[row][column].plot(x, j)
-#     column += 1
-#     column = column % n_columns
-#     if column == 0:
-#         row += 1
-#         row = row % n_rows
 
-fig, ax = plt.subplots()
-ax.plot(x, broadening_kernel_op(x, 0.25)[0], "o", markersize=0.8)
+def cc_weighted_average(kernels, kernel_range, x):
+    print(kernels.shape[0])
+    predicted_trace = np.empty(kernels.shape[0])
+    for i in range(kernels.shape[0]):
+        weights =kernels[i][ np.where(x == kernel_range[i][0])[0][0]: np.where(x == kernel_range[i][-1])[0][0] + 1]
+        weighted_average = np.average(kernel_range[i], weights=weights)
+        predicted_trace[i]= weighted_average
+    return predicted_trace
+
+
+cc_pre_day_fit = cc_weighted_average(time_dependent_broadening_kernels_pre_eclipse, kernel_range_pre, x)
 
 # Define Wavelength and Flux Grids
 wl = day_night_atmosphere["wl_day"]
@@ -218,7 +216,6 @@ vsys = np.linspace(-200, 200, 1001)
 vsys_kp = np.linspace(-30, 30, 1001)
 K = np.linspace(Kp - 85, Kp + 85, 1001)
 
-flux_model = scisig.fftconvolve(flux_tot, ref_kernel, "same")
 
 CC_pre = Cross_Correlator(wl, flux_tot, vsys * 1000, total_convolved_spectrum_pre)
 
@@ -471,56 +468,6 @@ Kp_vsys_night_post, _ = Kp_vsys_Plotter(
 Kp_vsys_night = Kp_vsys_night_pre + Kp_vsys_night_post
 Kp_vsys_day = Kp_vsys_day_pre + Kp_vsys_day_post
 
-# fig, ax = plt.subplots(2)
-#
-# ax[0].pcolormesh(vsys_kp, K, Kp_vsys_night_pre)
-# ax[1].pcolormesh(vsys_kp, K, Kp_vsys_night_post)
-# fig.suptitle(r"$K_p$ - $v_{\text{sys}}$ Night")
-# fig.supxlabel(r"$v_{\text{sys}}$")
-# ax[0].set_title("Pre-Eclipse")
-# ax[1].set_title("Post-Eclipse")
-#
-# ax[0].axhline(
-#     K[maxIndex(Kp_vsys_night_pre)[0]],
-#     ls="--",
-#     color="red",
-#     lw=0.5,
-#     label=r"Measured $K_p$ = " + f"{K[maxIndex(Kp_vsys_night_pre)[0]]:.2f}km/s",
-# )
-#
-# ax[0].axvline(
-#     vsys_kp[maxIndex(Kp_vsys_night_pre)[1]],
-#     ls="--",
-#     color="red",
-#     lw=0.5,
-#     label=r"Measured $v_{\text{sys}}$ = "
-#     + f"{vsys_kp[maxIndex(Kp_vsys_night_pre)[1]]:.2f}km/s",
-# )
-#
-# ax[1].axhline(
-#     K[maxIndex(Kp_vsys_night_post)[0]],
-#     ls="--",
-#     color="red",
-#     lw=0.5,
-#     label=r"Measured $K_p$ = " + f"{K[maxIndex(Kp_vsys_night_post)[0]]:.2f}km/s",
-# )
-#
-# ax[1].axvline(
-#     vsys_kp[maxIndex(Kp_vsys_night_post)[1]],
-#     ls="--",
-#     color="red",
-#     lw=0.5,
-#     label=r"Measured $v_{\text{sys}}$ = "
-#     + f"{vsys_kp[maxIndex(Kp_vsys_night_post)[1]]:.2f}km/s",
-# )
-#
-# ax[0].legend(
-#     loc="upper left",
-# )
-# ax[1].legend(
-#     loc="upper left",
-# )
-
 
 def kp_fitter(kp, op):
     return kp * np.sin(2 * np.pi * op)
@@ -688,5 +635,18 @@ ax[0].legend(
 ax[1].legend(
     loc="upper left",
 )
+
+np.savez(
+    os.path.join(local_path, "day-night_kp_night"),
+    tot = combined_Kp_plot,
+    day = Kp_vsys_day,
+    night = Kp_vsys_night,
+    cc_day_pre = CC_day_pre,
+    cc_day_post = CC_day_post,
+    cc_night_pre = CC_night_pre,
+    cc_night_post = CC_night_post,
+    cc_tot_pre = CC_pre, 
+    cc_tot_post = CC_post, 
+        )
 
 plt.show()
