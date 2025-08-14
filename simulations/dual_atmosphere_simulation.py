@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import sys
-from astropy import constants as const
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -65,7 +64,6 @@ def rotational_broadening_kernel(x, op, veq):
 
     # Takes the half kernel (right side)
     ref_kernel[: x.shape[0] // 2] = np.zeros(x.shape[0] // 2)
-    period_scaler = period / (4 * (tdur - tfull) / 2)
 
     for i, op_i in enumerate(op):
         # Fit all op values between 0 and 1

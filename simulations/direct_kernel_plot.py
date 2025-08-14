@@ -7,16 +7,11 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-from functions.functions import time_dependent_spectrum
-from functions.functions import cross_correlator
 from functions.functions import kp_vsys_plotter
-from functions.functions import kp_vsys_map_from_flux
 from functions.functions import maxindex
 from functions.functions import vel_array
 
 from astropy import constants as const
-import scipy.signal as scisig
-import time
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 local_path = os.path.join(script_dir, "../data")

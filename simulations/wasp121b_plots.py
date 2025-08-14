@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 from astropy import constants as const
 import os
 import sys
@@ -69,7 +68,6 @@ def rotational_broadening_kernel(x, op, veq):
 
     # Takes the half kernel (right side)
     ref_kernel[: x.shape[0] // 2] = np.zeros(x.shape[0] // 2)
-    period_scaler = period / (4 * (tdur - tfull) / 2)
 
     for i, op_i in enumerate(op):
         # Fit all op values between 0 and 1
@@ -184,13 +182,10 @@ K_vsys_map_post_eclipse, _ = kp_vsys_plotter(
 )
 
 combined_Kp_plot = K_vsys_map_post_eclipse + K_vsys_map_pre_eclipse
-max_lines_pre = np.where(K_vsys_map_pre_eclipse == np.max(K_vsys_map_pre_eclipse))
-max_lines_post = np.where(K_vsys_map_post_eclipse == np.max(K_vsys_map_post_eclipse))
-max_lines = np.where(combined_Kp_plot == np.max(combined_Kp_plot))
 
-Kp_from_plot = K[max_lines[0][0]]
-Kp_from_plot_pre = K[max_lines_pre[0][0]]
-Kp_from_plot_post = K[max_lines_post[0][0]]
+Kp_from_plot = K[maxindex(combined_Kp_plot)[0]]
+Kp_from_plot_pre = K[maxindex(K_vsys_map_pre_eclipse)]
+Kp_from_plot_post = K[maxindex(K_vsys_map_post_eclipse)]
 
 fig, ax = plt.subplots(3, sharex="all", sharey="all")
 fig.suptitle(r"$K_p$ - $v_{\text{sys}}$ Plots for Different Simulations")
@@ -198,7 +193,6 @@ ax[0].set_title(r"$V_{\text{eq}}$ Kernel")
 ax[1].set_title(r"No Kernel")
 ax[2].set_title(r"Gaussian Kernel")
 ax[0].pcolormesh(vsys_kp, K, combined_Kp_plot)
-# ax[0].imshow(combined_Kp_plot, aspect="auto")
 fig.supylabel(r"$K_p$")
 fig.supxlabel(r"$v_{\text{sys}}$")
 ax[0].axhline(Kp, ls="--", color="red", lw=0.5, label=r"Actual $K_p$ = " + f"{Kp:.2f}")
@@ -210,7 +204,7 @@ ax[0].axhline(
     lw=0.5,
     label=r"Measured $K_p$ =" + f"{Kp_from_plot:.2f}",
 )
-ax[0].axvline(vsys_kp[max_lines[1][0]], ls="--", color="orange", lw=0.5)
+ax[0].axvline(vsys_kp[maxindex(combined_Kp_plot)[1]], ls="--", color="orange", lw=0.5)
 ax[0].legend(loc="upper left")
 
 

@@ -1,8 +1,6 @@
 import numpy as np
 import astropy.constants as const
-from numpy.core.multiarray import ndarray
 import scipy.signal as scisig
-import time
 
 
 def maxindex(a):
