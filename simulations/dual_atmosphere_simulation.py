@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 import os
 import sys
 from astropy import constants as const
-import scipy.signal as scisig
-import time
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
