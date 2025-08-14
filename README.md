@@ -5,4 +5,5 @@ Code implements a time dependent "kernel" to model the phases of the exoplanet a
 
 **Note**
 To run the spectrum generation directory one must have the petitRADTRANS package installed. https://petitradtrans.readthedocs.io/en/latest/
+
 This isn't neccessary to run the simulations directory as the output from spectrum_generation is in the data directory. This is so one can demonstrate the rotational broadening kernel without generating their own spectra.
