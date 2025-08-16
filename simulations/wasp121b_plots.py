@@ -14,6 +14,7 @@ from functions.functions import kp_vsys_plotter
 from functions.functions import kp_vsys_map_from_flux
 from functions.functions import maxindex
 from functions.functions import vel_array
+from functions.rotational_broadening_kernel import rotational_broadening_kernel
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 local_path = os.path.join(script_dir, "../data")
@@ -45,68 +46,6 @@ eclipse_end = 0.5 - tfull / period
 veq = 2 * np.pi * Rpl / period  # km/s ~ 7km/s
 
 # veq = 35 # effect exaggerated
-
-
-# x kernel range and op orbital phase
-def rotational_broadening_kernel(x, op, veq):
-    # Allows float or int values of op to be passed
-    if not isinstance(op, np.ndarray):
-        op = np.array([op])
-
-    kernel_array = np.zeros(shape=(op.shape[0], x.shape[0]))
-
-    # Sets valid range given veq
-    ref_range = np.array([i for i in x if abs(i) <= veq])
-
-    ref_kernel = np.sqrt(1 - (ref_range / veq) ** 2)
-    # Pads evenly the rest of the range with zeros
-    ref_padding = abs(x.shape[0] - ref_range.shape[0]) // 2
-    ref_kernel = np.pad(ref_kernel, ref_padding, "constant")
-
-    normaliser = np.sum(ref_kernel)
-    ref_kernel /= normaliser
-
-    # Takes the half kernel (right side)
-    ref_kernel[: x.shape[0] // 2] = np.zeros(x.shape[0] // 2)
-
-    for i, op_i in enumerate(op):
-        # Fit all op values between 0 and 1
-        if op_i < 0:
-            ref_op = op_i + 1
-        else:
-            ref_op = op_i
-
-        vel = veq * np.cos(2 * np.pi * ref_op)
-
-        # Consider 0 case
-        if vel == 0:
-            kernel = ref_kernel
-            kernel_range = ref_range
-            # Consider opposite side of orbit
-            if ref_op < 0.5:
-                kernel = np.flip(kernel)
-
-        else:
-            kernel_range = np.array([i for i in x if abs(i) <= abs(vel)])
-            kernel = np.sqrt(1 - (kernel_range / abs(vel)) ** 2) / normaliser
-            padding = abs(x.shape[0] - kernel_range.shape[0]) // 2
-            kernel = np.pad(kernel, padding, "constant")
-            if vel < 0:
-                kernel[x.shape[0] // 2 :] = np.zeros(x.shape[0] // 2 + 1)
-                kernel += ref_kernel
-            if vel > 0:
-                kernel[: x.shape[0] // 2] = np.zeros(x.shape[0] // 2)
-                kernel = ref_kernel - kernel
-            if ref_op < 0.5:
-                kernel = np.flip(kernel)
-        # Saves kernel to kernel array
-        kernel_array[i] = kernel
-
-    if kernel_array.shape[0] == 1:
-        return kernel_array[0]
-    else:
-        return kernel_array
-
 
 resolution = 400000
 dv = const.c.value * 1e-3 / resolution

@@ -45,6 +45,7 @@ def time_dependent_spectrum(wl, flux, op, kp, kernel=None, wl_grid=None):
     # Return spectrum if no kernel
     if not isinstance(kernel, np.ndarray):
         spectrum = np.interp(Wavelengths, wl, flux)
+        print("Unconvolved spectrum generated")
         return spectrum
 
     else:
@@ -58,6 +59,8 @@ def time_dependent_spectrum(wl, flux, op, kp, kernel=None, wl_grid=None):
         else:
             convolved_flux = scisig.fftconvolve(flux, kernel, 'same')
             convolved_spectrum = np.interp(Wavelengths, wl, convolved_flux)
+        print("Convolved spectrum generated")
+
     return convolved_spectrum
 
 
@@ -65,6 +68,7 @@ def cross_correlator(wl, flux, vsys, spectrum):
     wl_doppler = np.outer(1 - vsys / const.c.value, wl)
     model = np.interp(wl_doppler, wl, flux)
     CC = np.dot(spectrum, model.T)
+    print("Cross correlation complete")
     return CC
 
 
@@ -88,6 +92,7 @@ def kp_vsys_plotter(K, vsys, op, CC, vsys_kp=None):
                 CC_array[j] = np.interp(vsys_kp + vel, vsys, CC[j])
         K_vsys_map[i] = np.sum(CC_array, axis=0)
         CC_shifted[i] = CC_array
+    print("Trace summed over all values of Kp")
     return K_vsys_map, CC_shifted
 
 

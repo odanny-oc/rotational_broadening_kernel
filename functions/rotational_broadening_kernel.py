@@ -22,6 +22,7 @@ def rotational_broadening_kernel(x, op, veq):
     ref_kernel /= normaliser
     # Takes right hand side of the kernel (op = 0.75)
     ref_kernel[: x.shape[0] // 2] = np.zeros(x.shape[0] // 2)
+    print("Reference kernel generated")
 
     for i, op_i in enumerate(op):
         # Change to range of (0,1)
@@ -57,6 +58,8 @@ def rotational_broadening_kernel(x, op, veq):
                 kernel = np.flip(kernel)
 
         kernel_array[i] = kernel
+
+    print("Kernels generated for all orbital phases given")
 
     # For single values of orbital phase
     if kernel_array.shape[0] == 1:
