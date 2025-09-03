@@ -39,5 +39,5 @@ The results of these models seem to be a breakdown in the Keplerian model of the
 
 <img width="640" height="480" alt="direct_kernel_git" src="https://github.com/user-attachments/assets/f46ea61f-be1f-4015-92dd-5203b68d7033" />
 
-While it still obviously follow an overall sinusoidal shape, the small inconsistencies due to the rotaional broadening cause the traditional methods of analysis, Kp-vsys plots, tp be ineffective. I believe this model demonstrates that with more understanding of this effect, we could retrieve more information about the speed of the planet and increase our spacial resolution, decreasing the uncertainty of measurement of atmospheric species.
+While it still obviously follow an overall sinusoidal shape, the small inconsistencies due to the rotaional broadening cause the traditional methods of analysis, Kp-vsys plots, to be ineffective. I believe this model demonstrates that with more understanding of this effect, we could retrieve more information about the speed of the planet and increase our spacial resolution, decreasing the uncertainty of measurement of atmospheric species.
 
