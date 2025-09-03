@@ -10,7 +10,7 @@ To run the spectrum generation directory one must have the petitRADTRANS package
 This isn't neccessary to run the simulations directory, as the output from spectrum_generation is in the data directory. This is so one can demonstrate the rotational broadening kernel without generating their own spectra.
 
 # How it works
-For a given spectra over time (in this case over an exoplanets "orbital phase"), it follows a Keplerian (sinusodal) motion as the bulk velocity of the planet red and blue shifts the spectrum. Here is a simulated spectrum from the data directory of H2O in the planet WASP-121b.
+For a given spectra over time (in this case over an exoplanets "orbital phase"), it follows a Keplerian (sinusoidal) motion as the bulk velocity of the planet red and blue shifts the spectrum. Here is a simulated spectrum from the data directory of H2O in the planet WASP-121b.
 
 <img width="640" height="480" alt="spectrum_git" src="https://github.com/user-attachments/assets/40867a9e-b8c1-4759-a403-58bc40c68540" />
 
@@ -35,9 +35,9 @@ This allows both sides to analysied seperately.
 
 <img width="640" height="480" alt="anti_kernels_git" src="https://github.com/user-attachments/assets/f2fd0601-85ba-4cf6-bfa6-0b3d45de5d04" />
 
-The results of these models seem to be a breakdown in the Keplerian model of the exoplanet as the change in strength and direction of the rotaional broading breaks the sinusodal pattern of the planet motion. This can be seen by plotting the kernels directly over time;
+The results of these models seem to be a breakdown in the Keplerian model of the exoplanet as the change in strength and direction of the rotaional broading breaks the sinusoidal pattern of the planet motion. This can be seen by plotting the kernels directly over time;
 
 <img width="640" height="480" alt="direct_kernel_git" src="https://github.com/user-attachments/assets/f46ea61f-be1f-4015-92dd-5203b68d7033" />
 
-While it still obviously follow an overall sinusodal shape, the small inconsistencies due to the rotaional broadening cause the traditional methods of analysis, Kp-vsys plots, tp be ineffective. I believe this model demonstrates that with more understanding of this effect, we could retrieve more information about the speed of the planet and increase our spacial resolution, decreasing the uncertainty of measurement of atmospheric species.
+While it still obviously follow an overall sinusoidal shape, the small inconsistencies due to the rotaional broadening cause the traditional methods of analysis, Kp-vsys plots, tp be ineffective. I believe this model demonstrates that with more understanding of this effect, we could retrieve more information about the speed of the planet and increase our spacial resolution, decreasing the uncertainty of measurement of atmospheric species.
 
