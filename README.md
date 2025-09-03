@@ -35,7 +35,7 @@ This allows both sides to analysied seperately.
 
 <img width="640" height="480" alt="anti_kernels_git" src="https://github.com/user-attachments/assets/f2fd0601-85ba-4cf6-bfa6-0b3d45de5d04" />
 
-The results of these models seem to be a breakdown in the Keplerian model of the exoplanet as the change in strength and direction of the rotaional broading breaks the sinusoidal pattern of the planet motion. This can be seen by plotting the kernels directly over time;
+The results of these models seem to be a breakdown in the Keplerian model of the exoplanet as the change in strength and direction of the rotaional broading breaks the sinusoidal pattern of the planet motion. This can be seen by adding the bulk velocity to the kernels and plotting them directly over time;
 
 <img width="640" height="480" alt="direct_kernel_git" src="https://github.com/user-attachments/assets/f46ea61f-be1f-4015-92dd-5203b68d7033" />
 
